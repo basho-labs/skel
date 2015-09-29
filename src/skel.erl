@@ -30,7 +30,11 @@
 %%    list <tt>Images</tt> using the Sequential Function wrapper.
 %%
 run(WorkFlow, Input) ->
-  sk_assembler:run(WorkFlow, Input).
+  sk_assembler:run(WorkFlow, Input, false).
+
+-spec run(workflow(), input(), boolean()) -> pid().
+run(WorkFlow, Input, FlowControl_p) ->
+  sk_assembler:run(WorkFlow, Input, FlowControl_p).
 
 -spec do(workflow(), list()) -> list().
 %% @doc The second entry-point function to the Skel library. This function 
@@ -53,8 +57,6 @@ do(WorkFlow, Input) ->
 
 -spec bp_do(workflow(), list()) -> list().
 bp_do(WorkFlow, Input) ->
-    io:format(user, "~s ~w ~w: before run()\n", [?MODULE, ?LINE, self()]),
-    run(WorkFlow, Input),
-    io:format(user, "~s ~w ~w: after run()\n", [?MODULE, ?LINE, self()]),
+    run(WorkFlow, Input, true),
     ok.
 

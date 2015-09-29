@@ -15,7 +15,7 @@
 -export([
          make/2
 	,make_hyb/4
-        ,run/2
+        ,run/3
         ]).
 
 -include("skel.hrl").
@@ -40,16 +40,16 @@ make_hyb(WorkFlow, EndPid, NCPUWorkers, NGPUWorkers) when is_pid(EndPid) ->
   lists:foldr(fun(MakeFn, Pid) -> MakeFn(Pid) end, EndPid, MakeFns).
     
 
--spec run(pid() | workflow(), input()) -> pid().
+-spec run(pid() | workflow(), input(), boolean()) -> pid().
 %% @doc Function to produce and start a set of processes according to the 
 %% given workflow specification and input.
-run(WorkFlow, Input) when is_pid(WorkFlow) ->
-  Feeder = sk_source:make(Input),
+run(WorkFlow, Input, FlowControl_p) when is_pid(WorkFlow) ->
+  Feeder = sk_source:make(Input, FlowControl_p),
   Feeder(WorkFlow);
-run(WorkFlow, Input) when is_list(WorkFlow) ->
+run(WorkFlow, Input, FlowControl_p) when is_list(WorkFlow) ->
   DrainPid = (sk_sink:make())(self()),
   AssembledWF = make(WorkFlow, DrainPid),
-  run(AssembledWF, Input).
+  run(AssembledWF, Input, FlowControl_p).
 
 parse_hyb(Section, NCPUWorkers, NGPUWorkers) ->
     case Section of

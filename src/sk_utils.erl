@@ -1,6 +1,7 @@
 %%%----------------------------------------------------------------------------
 %%% @author Sam Elliott <ashe@st-andrews.ac.uk>
 %%% @copyright 2012 University of St Andrews (See LICENCE)
+%%% @copyright 2015 Basho Technologies, Inc. (See LICENCE)
 %%% @headerfile "skel.hrl"
 %%% @doc This module contains functions designed to start and stop worker 
 %%% processes, otherwise known and referred to as simply <em>workers</em>.
@@ -15,6 +16,8 @@
         ,start_workers_hyb/5 
         ,start_worker/2
         ,stop_workers/2
+        ,bp_signal_upstream/2
+        ,bp_get_want_signal/1
         ]).
 
 -include("skel.hrl").
@@ -70,3 +73,33 @@ stop_workers(Mod, [Worker|Rest]) ->
   Worker ! {system, eos},
   stop_workers(Mod, Rest).
 
+
+-spec bp_signal_upstream(pid(), non_neg_integer()) -> 'ok'.
+bp_signal_upstream(UpstreamPid, InFlight) ->
+    %% io:format(user, "~s ~w ~w: send_want(~w <- ~w)\n", [?MODULE,?LINE,self(),UpstreamPid, InFlight]),
+    UpstreamPid ! {system, bp_want, self(), InFlight},
+    ok.
+
+-spec bp_get_want_signal(integer()) -> integer().
+bp_get_want_signal(0) ->
+    WantCount = bp_get_want_messages(0),
+    WantCount - 1;
+bp_get_want_signal(WantCount) ->
+    %% io:format(user, "~w: bp_get_want_signal(~w)\n", [self(), WantCount]),
+    WantCount - 1.
+
+bp_get_want_messages(0) ->
+    %% Blocking case.
+    %% io:format(user, "~s ~w ~w: get_want(0)\n", [?MODULE,?LINE,self()]),
+    receive
+        {system, bp_want, _Pid, InFlight} ->
+            bp_get_want_messages(InFlight)
+    end;
+bp_get_want_messages(WantCount) ->
+    %% io:format(user, "~s ~w ~w: get_want(~w)\n", [?MODULE,?LINE,self(),WantCount]),
+    receive
+        {system, bp_want, _Pid, InFlight} ->
+            bp_get_want_messages(WantCount + InFlight)
+    after 0 ->
+            WantCount
+    end.

@@ -44,41 +44,41 @@
 
 -spec make(function(), term()) -> maker_fun().
 %% @doc Creates the process to which the final results are sent.
-make(Fun, InitData) ->
+make(WorkerFun, InitData) ->
   fun(Pid) ->
-    spawn(?MODULE, start_acc, [Pid, Fun, InitData])
+    spawn(?MODULE, start_acc, [Pid, WorkerFun, InitData])
   end.
 
 -spec start_acc(pid(), function(), term()) -> 'eos'.
 %% @doc Sets the sink process to receive messages from other processes.
-start_acc(NextPid, Fun, InitData) ->
-    {InFlight, FittingState} = Fun({bp_init, InitData}, ignored_placeholder),
-    ?VV("start_acc: inf ~w fs ~w\n", [InFlight, FittingState]),
+start_acc(NextPid, WorkerFun, InitData) ->
+    {InFlight, FittingState} = WorkerFun({bp_init, InitData},
+                                         ignored_placeholder),
+    %% ?VV("start_acc: inf ~w fs ~w\n", [InFlight, FittingState]),
     receive
         {system, bp_upstream_fitting, UpstreamPid} ->
-            ?VV("start_acc: my upstream is ~w\n", [UpstreamPid]),
-            signal_upstream(UpstreamPid, InFlight),
-            loop_acc(UpstreamPid, NextPid, Fun, FittingState)
+            %% ?VV("start_acc: my upstream is ~w\n", [UpstreamPid]),
+            sk_utils:bp_signal_upstream(UpstreamPid, InFlight),
+            loop_acc(UpstreamPid, NextPid, WorkerFun, FittingState)
     end.
 
 -spec loop_acc(pid(), pid(), function(), term()) -> 'eos'.
 %% @doc Recursively recieves messages, collecting each result in a list. 
 %% Returns the list of results when the system message <tt>eos</tt> is 
 %% received. 
-loop_acc(UpstreamPid, NextPid, Fun, FittingState) ->
+loop_acc(UpstreamPid, NextPid, WorkerFun, FittingState) ->
+    %% ?VV("loop_acc top\n", []),
     receive
         {data, _, _} = DataMessage ->
-            signal_upstream(UpstreamPid, 1),
+            sk_utils:bp_signal_upstream(UpstreamPid, 1),
             Value = sk_data:value(DataMessage),
             sk_tracer:t(50, self(), {?MODULE, data}, [{input, DataMessage}, {value, Value}]),
 
-            {ok, FittingState2} = Fun(Value, FittingState),
-            loop_acc(UpstreamPid, NextPid, Fun, FittingState2);
+            {ok, FittingState2} = WorkerFun(Value, FittingState),
+            loop_acc(UpstreamPid, NextPid, WorkerFun, FittingState2);
         {system, eos} ->
             sk_tracer:t(75, self(), {?MODULE, system}, [{msg, eos}]),
-            {ok, _FittingState2} = Fun(bp_eoi, FittingState),
+            %% ?VV("loop_acc received eos\n", []),
+            {ok, _FittingState2} = WorkerFun(bp_eoi, FittingState),
             eos
     end.
-
-signal_upstream(UpstreamPid, InFlight) ->
-    UpstreamPid ! {system, bp_want, InFlight}.

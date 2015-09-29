@@ -1,6 +1,7 @@
 %%%----------------------------------------------------------------------------
 %%% @author Sam Elliott <ashe@st-andrews.ac.uk>
 %%% @copyright 2012 University of St Andrews (See LICENCE)
+%%% @copyright 2015 Basho Technologies, Inc. (See LICENCE)
 %%% @headerfile "skel.hrl"
 %%%
 %%% @doc This module encapsulates all functions relating to data messages that
@@ -18,6 +19,7 @@
         ,pure/1
         ,apply/1
         ,value/1
+        ,identifiers/1
         ,push/2
         ,pop/1
         ,peek/1
@@ -52,6 +54,11 @@ apply({data, Fun, _}) ->
 %% @doc Extracts and returns a data message's value.
 value({data, Value, _Identifiers}) ->
   Value.
+
+-spec identifiers(data_message()) -> list().
+%% @doc Extracts and returns a data message's identifiers.
+identifiers({data, _Value, Identifiers}) ->
+  Identifiers.
 
 -spec push(dm_identifier(), data_message()) -> data_message().
 %% @doc Adds an identifier to a given data message.

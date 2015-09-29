@@ -16,8 +16,8 @@
 -module(sk_source).
 
 -export([
-         make/1
-        ,start/2
+         make/2
+        ,start/3
         ]).
 
 -include("skel.hrl").
@@ -43,20 +43,20 @@
 
 %% @doc Creates a new child process using Input, given the parent process 
 %% <tt>Pid</tt>.
--spec make(input()) -> maker_fun().
-make(Input) ->
+-spec make(input(), boolean()) -> maker_fun().
+make(Input, FlowControl_p) ->
   fun(Pid) ->
-    spawn(?MODULE, start, [Input, Pid])
+    spawn(?MODULE, start, [Input, Pid, FlowControl_p])
   end.
 
 %% @doc Transmits each input in <tt>Input</tt> to the process <tt>NextPid</tt>.
 %% @todo add documentation for the callback loop
--spec start(input(), pid()) -> 'eos'.
-start(Input, NextPid) when is_list(Input) ->
+-spec start(input(), pid(), boolean()) -> 'eos'.
+start(Input, NextPid, FlowControl_p) when is_list(Input) ->
     NextPid ! {system, bp_upstream_fitting, self()},
-    ?VV("start: tell ~w I am its upstream\n", [NextPid]),
-    list_loop(Input, NextPid);
-start(InputMod, NextPid) when is_atom(InputMod) ->
+    %% ?VV("start: tell ~w I am its upstream\n", [NextPid]),
+    list_loop(Input, NextPid, FlowControl_p, 0);
+start(InputMod, NextPid, _FlowControl_p) when is_atom(InputMod) ->
   case InputMod:init() of
     {ok, State} -> callback_loop(InputMod, State, NextPid);
     {no_inputs, State}  ->
@@ -66,11 +66,16 @@ start(InputMod, NextPid) when is_atom(InputMod) ->
 
 %% @doc Recursively sends each input in a given list to the process 
 %% <tt>NextPid</tt>.
-list_loop([], NextPid) ->
+list_loop([], NextPid, _FlowControl_p, _WantCount) ->
     send_eos(NextPid);
-list_loop([Input|Inputs], NextPid) ->
+list_loop([Input|Inputs], NextPid, FlowControl_p, WantCount) ->
+    WantCount2 = if FlowControl_p ->
+                         sk_utils:bp_get_want_signal(WantCount);
+                    true ->
+                         WantCount
+                 end,
     send_input(Input, NextPid),
-    list_loop(Inputs, NextPid).
+    list_loop(Inputs, NextPid, FlowControl_p, WantCount2).
 
 %% @todo doc
 callback_loop(InputMod, State, NextPid) ->
