@@ -4,8 +4,11 @@
 %%%----------------------------------------------------------------------------
 %% Defines the workflow concept. A workflow is a specification that defines how work should be undertaken, it is a list of one or more skeletons.
 -type workflow()  :: [wf_item(),...]. 
+-type init_data() :: term().
 
 -type wf_item()   :: {seq,      worker_fun()}
+                   | {bp_seq,   worker_fun(), init_data()}
+                   | {bp_sink,  workflow(), init_data()}
                    | {pipe,     workflow()}
                    | {ord,      workflow()}
                    | {farm,     workflow(), pos_integer()}

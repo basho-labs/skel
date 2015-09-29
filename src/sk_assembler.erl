@@ -1,6 +1,7 @@
 %%%----------------------------------------------------------------------------
 %%% @author Sam Elliott <ashe@st-andrews.ac.uk>
 %%% @copyright 2012 University of St Andrews (See LICENCE)
+%%% @copyright 2015 Basho Technologies, Inc. (See LICENCE)
 %%% @headerfile "skel.hrl"
 %%%
 %%% @doc This module takes a workflow specification, and converts it in into a
@@ -65,6 +66,10 @@ parse(Fun) when is_function(Fun, 1) ->
   parse({seq, Fun});
 parse({seq, Fun}) when is_function(Fun, 1) ->
   sk_seq:make(Fun);
+parse({bp_seq, Fun, InitData}) when is_function(Fun, 2) ->
+  sk_bp_seq:make(Fun, InitData);
+parse({bp_sink, Fun, InitData}) when is_function(Fun, 2) ->
+  sk_bp_sink:make(Fun, InitData);
 parse({pipe, WorkFlow}) ->
   sk_pipe:make(WorkFlow);
 parse({ord, WorkFlow}) ->

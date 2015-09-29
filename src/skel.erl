@@ -1,6 +1,7 @@
 %%%----------------------------------------------------------------------------
 %%% @author Sam Elliott <ashe@st-andrews.ac.uk>
 %%% @copyright 2012 University of St Andrews (See LICENCE)
+%%% @copyright 2015 Basho Technologies, Inc. (See LICENCE)
 %%% @headerfile "skel.hrl"
 %%% @doc This module is the root module of the 'Skel' library, including 
 %%% entry-point functions.
@@ -12,6 +13,7 @@
 -export([
          run/2
         ,do/2
+        ,bp_do/2
         ]).
 
 -include("skel.hrl").
@@ -48,4 +50,11 @@ do(WorkFlow, Input) ->
     {sink_results, Results} -> 
         Results
   end.
+
+-spec bp_do(workflow(), list()) -> list().
+bp_do(WorkFlow, Input) ->
+    io:format(user, "~s ~w ~w: before run()\n", [?MODULE, ?LINE, self()]),
+    run(WorkFlow, Input),
+    io:format(user, "~s ~w ~w: after run()\n", [?MODULE, ?LINE, self()]),
+    ok.
 

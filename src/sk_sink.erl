@@ -1,6 +1,7 @@
 %%%----------------------------------------------------------------------------
 %%% @author Sam Elliott <ashe@st-andrews.ac.uk>
 %%% @copyright 2012 University of St Andrews (See LICENCE)
+%%% @copyright 2015 Basho Technologies, Inc. (See LICENCE)
 %%% @headerfile "skel.hrl"
 %%% 
 %%% @doc This module contains the sink logic.

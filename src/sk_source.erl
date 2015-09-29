@@ -1,6 +1,7 @@
 %%%----------------------------------------------------------------------------
 %%% @author Sam Elliott <ashe@st-andrews.ac.uk>
 %%% @copyright 2012 University of St Andrews (See LICENCE)
+%%% @copyright 2015 Basho Technologies, Inc. (See LICENCE)
 %%% @headerfile "skel.hrl"
 %%% @doc This module contains the source logic.
 %%%
@@ -24,6 +25,9 @@
 -ifdef(TEST).
 -compile(export_all).
 -endif.
+
+-define(V(Fmt, Args), io:format(user, Fmt, Args)).
+-define(VV(Fmt, Args), io:format(user, "~s ~w ~w: " ++ Fmt, [?MODULE,?LINE,self()]++Args)).
 
 -callback init() ->
     {ok, State :: term()} |
@@ -49,7 +53,9 @@ make(Input) ->
 %% @todo add documentation for the callback loop
 -spec start(input(), pid()) -> 'eos'.
 start(Input, NextPid) when is_list(Input) ->
-  list_loop(Input, NextPid);
+    NextPid ! {system, bp_upstream_fitting, self()},
+    ?VV("start: tell ~w I am its upstream\n", [NextPid]),
+    list_loop(Input, NextPid);
 start(InputMod, NextPid) when is_atom(InputMod) ->
   case InputMod:init() of
     {ok, State} -> callback_loop(InputMod, State, NextPid);
@@ -61,10 +67,10 @@ start(InputMod, NextPid) when is_atom(InputMod) ->
 %% @doc Recursively sends each input in a given list to the process 
 %% <tt>NextPid</tt>.
 list_loop([], NextPid) ->
-  send_eos(NextPid);
+    send_eos(NextPid);
 list_loop([Input|Inputs], NextPid) ->
-  send_input(Input, NextPid),
-  list_loop(Inputs, NextPid).
+    send_input(Input, NextPid),
+    list_loop(Inputs, NextPid).
 
 %% @todo doc
 callback_loop(InputMod, State, NextPid) ->

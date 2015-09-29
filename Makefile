@@ -14,6 +14,9 @@ clean:
 compile: src/*.erl
 	@./rebar compile
 
+test: compile
+	@./rebar eunit
+
 console: compile
 	@exec erl -args_file ./priv/default.args
 
