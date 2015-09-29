@@ -84,6 +84,31 @@ smoke_bp_seq_test() ->
            end,
     Inputs = Res2.
 
+%% Remove the "_skip" suffix from the name to run a verbose test that
+%% shows the pipe-style parallelism with the bp_seq list with a
+%% bp_sink at the end.
+
+-spec smoke_bp_seq_sleep_test() -> term().
+smoke_bp_seq_sleep_test() ->
+    Inputs = lists:seq(1,10),
+    Me = self(),
+    MyRef = make_ref(),
+
+    timer:sleep(50),?VV("\n", []),?VV("smoke_bp_seq_sleep_test: top\n", []),
+    _X = skel:bp_do([{bp_seq, fun bp_verbose_sleep/2, 50},
+                     {bp_seq, fun bp_verbose_sleep/2, 70},
+                     {bp_seq, fun bp_verbose_sleep/2, 90},
+                     {bp_seq, fun bp_verbose_sleep/2, 0},
+                     {bp_sink, fun bp_demo_sink/2, {Me,MyRef}}], Inputs),
+    Res2 = receive
+               {sink_final_result, MyRef, Val} ->
+                   Val
+           end,
+    %% The last sleep with a 0 sleep time doesn't emit anything, so
+    %% the sink doesn't collect anything.  But, nevertheless, we run
+    %% to completion, yay!
+    [] = Res2.
+
 identity(X) ->
     X.
 
@@ -164,5 +189,21 @@ bp_truncate(bp_eoi, S) ->
 bp_truncate(X, #demo{acc=Acc}=S) ->
     Res = trunc(X),
     {[Res], S#demo{acc=Acc+Res}}.
+
+bp_verbose_sleep({bp_init, InitData}, _Ignore) ->
+    InFlight = 2,
+    {InFlight, #demo{acc=InitData, downstream=undefined}};
+bp_verbose_sleep({bp_downstream, DownStream}, S) ->
+    {ok, S#demo{downstream=DownStream}};
+bp_verbose_sleep(bp_eoi, S) ->
+    {ok, S};
+bp_verbose_sleep(X, #demo{acc=SleepTime}=S) ->
+    ?VV("verbose sleep: got ~p, my time = ~w\n", [X, SleepTime]),
+    timer:sleep(SleepTime),
+    ?VV("verbose sleep: done\n", []),
+    Emits = if SleepTime == 0 -> [];
+               true           -> [X]
+            end,
+    {Emits, S}.
 
 -endif. % TEST
