@@ -84,12 +84,12 @@ smoke_bp_seq_test() ->
            end,
     Inputs = Res2.
 
-%% Remove the "_skip" suffix from the name to run a verbose test that
+%% Remove the "_SKIP" suffix from the name to run a verbose test that
 %% shows the pipe-style parallelism with the bp_seq list with a
 %% bp_sink at the end.
 
--spec smoke_bp_seq_sleep_test() -> term().
-smoke_bp_seq_sleep_test() ->
+-spec smoke_bp_seq_sleep_test_SKIP() -> term().
+smoke_bp_seq_sleep_test_SKIP() ->
     Inputs = lists:seq(1,10),
     Me = self(),
     MyRef = make_ref(),
