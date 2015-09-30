@@ -54,9 +54,9 @@
 %% then recomposed to be delivered as output.
 make(WorkFlow, Decomp, Recomp) ->
   fun(NextPid) ->
-    RecompPid = spawn(sk_cluster_recomp, start, [Recomp, NextPid]),
+    RecompPid = spawn_link(sk_cluster_recomp, start, [Recomp, NextPid]),
     WorkerPid = sk_utils:start_worker(WorkFlow, RecompPid),
-    spawn(sk_cluster_decomp, start, [Decomp, WorkerPid])
+    spawn_link(sk_cluster_decomp, start, [Decomp, WorkerPid])
   end.
 
 ceiling(X) ->
@@ -126,9 +126,9 @@ hyb_cluster_decomp_default(TimeRatio, StructSizeFun, MakeChunkFun, NCPUWorkers, 
 -spec make_hyb(workflow(), decomp_fun(), recomp_fun(), pos_integer(), pos_integer()) -> fun((pid()) -> pid()).
 make_hyb(Workflow, Decomp, Recomp, NCPUWorkers, NGPUWorkers) ->
     fun(NextPid) ->
-	    RecompPid = spawn(sk_cluster_recomp, start, [Recomp, NextPid]),
+	    RecompPid = spawn_link(sk_cluster_recomp, start, [Recomp, NextPid]),
 	    WorkerPid = sk_utils:start_worker_hyb(Workflow, RecompPid, NCPUWorkers, NGPUWorkers),
-	    spawn(sk_cluster_decomp, start, [fun (Input) -> hyb_cluster_decomp(Decomp, NCPUWorkers, NGPUWorkers, Input) end,
+	    spawn_link(sk_cluster_decomp, start, [fun (Input) -> hyb_cluster_decomp(Decomp, NCPUWorkers, NGPUWorkers, Input) end,
 					    WorkerPid])
     end.
 
@@ -137,18 +137,18 @@ make_hyb(Workflow, Decomp, Recomp, NCPUWorkers, NGPUWorkers) ->
 	       pos_integer(), pos_integer()) -> fun((pid()) -> pid()).
 make_hyb(Workflow, TimeRatio, StructSizeFun, MakeChunkFun, RecompFun, NCPUWorkers, NGPUWorkers) ->
     fun(NextPid) ->
-	    RecompPid = spawn(sk_cluster_recomp, start, [RecompFun, NextPid]),
+	    RecompPid = spawn_link(sk_cluster_recomp, start, [RecompFun, NextPid]),
 	    WorkerPid = sk_utils:start_worker_hyb(Workflow, RecompPid, NCPUWorkers, NGPUWorkers),
-	    spawn(sk_cluster_decomp, start, [fun (Input) -> hyb_cluster_decomp_default(TimeRatio, StructSizeFun, MakeChunkFun, NCPUWorkers, NGPUWorkers, Input) end,
+	    spawn_link(sk_cluster_decomp, start, [fun (Input) -> hyb_cluster_decomp_default(TimeRatio, StructSizeFun, MakeChunkFun, NCPUWorkers, NGPUWorkers, Input) end,
 					    WorkerPid])
     end.
     
 -spec make_hyb(workflow(), float(), pos_integer(), pos_integer()) -> fun((pid())->pid()).
 make_hyb(Workflow, TimeRatio, NCPUWorkers, NGPUWorkers) ->
     fun(NextPid) ->
-	    RecompPid = spawn(sk_cluster_recomp, start, [fun lists:flatten/1, NextPid]),
+	    RecompPid = spawn_link(sk_cluster_recomp, start, [fun lists:flatten/1, NextPid]),
 	    WorkerPid = sk_utils:start_worker_hyb(Workflow, RecompPid, NCPUWorkers, NGPUWorkers),
-	    spawn(sk_cluster_decomp, start, [fun (Input) -> hyb_cluster_decomp_default(TimeRatio, fun length/1,fun (Data,Pos) -> lists:split(Pos,Data) end, NCPUWorkers, NGPUWorkers, Input) end,
+	    spawn_link(sk_cluster_decomp, start, [fun (Input) -> hyb_cluster_decomp_default(TimeRatio, fun length/1,fun (Data,Pos) -> lists:split(Pos,Data) end, NCPUWorkers, NGPUWorkers, Input) end,
 					    WorkerPid])
     end.
     

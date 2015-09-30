@@ -11,14 +11,12 @@
 -module(skel).
 
 -export([
-         run/2
-        ,do/2
+         run/4
         ,bp_do/2
         ]).
 
 -include("skel.hrl").
 
--spec run(workflow(), input()) -> pid().
 %% @doc Primary entry-point function to the Skel library. Runs a specified 
 %% workflow passing <tt>Input</tt> as input. Does not receive or return any
 %% output from the workflow.
@@ -29,34 +27,17 @@
 %%    Here, skel runs the function <tt>p</tt> on all items in the 
 %%    list <tt>Images</tt> using the Sequential Function wrapper.
 %%
-run(WorkFlow, Input) ->
-  sk_assembler:run(WorkFlow, Input, false).
 
--spec run(workflow(), input(), boolean()) -> pid().
-run(WorkFlow, Input, FlowControl_p) ->
-  sk_assembler:run(WorkFlow, Input, FlowControl_p).
-
--spec do(workflow(), list()) -> list().
-%% @doc The second entry-point function to the Skel library. This function 
-%% <em>does</em> receive and return the results of the given workflow.
-%% 
-%% <h5>Example:</h5>
-%%    ```skel:do([{reduce, fun ?MODULE:reduce/2, fun ?MODULE:id/1}], Inputs)]'''
-%%
-%%      In this example, Skel uses the Reduce skeleton, where <tt>reduce</tt> 
-%%      and <tt>id</tt> are given as the reduction and decomposition functions 
-%%      respectively. The result for which is returned, and so can be printed 
-%%      or otherwise used.
-%%
-do(WorkFlow, Input) ->
-  run(WorkFlow, Input),
-  receive
-    {sink_results, Results} -> 
-        Results
-  end.
+-spec run(workflow(), input(), boolean(), pid()) -> pid().
+run(WorkFlow, Input, FlowControl_p, PidToNotify) ->
+  sk_assembler:run(WorkFlow, Input, FlowControl_p, PidToNotify).
 
 -spec bp_do(workflow(), list()) -> list().
 bp_do(WorkFlow, Input) ->
-    run(WorkFlow, Input, true),
-    ok.
-
+    FeederPid = run(WorkFlow, Input, true, self()),
+    receive
+        {chain_pids, _Pid, ChainPids}=_Msg ->
+            {FeederPid, ChainPids}
+    after 1000 ->
+            exit(skel_setup_timeout)
+    end.

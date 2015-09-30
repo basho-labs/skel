@@ -16,8 +16,8 @@
 -module(sk_source).
 
 -export([
-         make/2
-        ,start/3
+         make/3
+        ,start/4
         ]).
 
 -include("skel.hrl").
@@ -43,20 +43,24 @@
 
 %% @doc Creates a new child process using Input, given the parent process 
 %% <tt>Pid</tt>.
--spec make(input(), boolean()) -> maker_fun().
-make(Input, FlowControl_p) ->
+-spec make(input(), boolean(), pid()) -> maker_fun().
+make(Input, FlowControl_p, WhoToNotify) ->
   fun(Pid) ->
-    spawn(?MODULE, start, [Input, Pid, FlowControl_p])
+    spawn_link(?MODULE, start, [Input, Pid, FlowControl_p, WhoToNotify])
   end.
 
 %% @doc Transmits each input in <tt>Input</tt> to the process <tt>NextPid</tt>.
 %% @todo add documentation for the callback loop
--spec start(input(), pid(), boolean()) -> 'eos'.
-start(Input, NextPid, FlowControl_p) when is_list(Input) ->
-    NextPid ! {system, bp_upstream_fitting, self()},
+-spec start(input(), pid(), boolean(), pid()) -> 'eos'.
+start(Input, NextPid, FlowControl_p, WhoToNotify) when is_list(Input) ->
+    NextPid ! {system, bp_upstream_fitting, self(), self(), []},
+    receive
+        {system, bp_chain_pids, ChainPids} ->
+            WhoToNotify ! {chain_pids, self(), ChainPids}
+    end,
     %% ?VV("start: tell ~w I am its upstream\n", [NextPid]),
     list_loop(Input, NextPid, FlowControl_p, 0);
-start(InputMod, NextPid, _FlowControl_p) when is_atom(InputMod) ->
+start(InputMod, NextPid, _FlowControl_p, _WhoToNotify) when is_atom(InputMod) ->
   case InputMod:init() of
     {ok, State} -> callback_loop(InputMod, State, NextPid);
     {no_inputs, State}  ->

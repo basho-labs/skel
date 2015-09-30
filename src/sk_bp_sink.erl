@@ -46,7 +46,7 @@
 %% @doc Creates the process to which the final results are sent.
 make(WorkerFun, InitData) ->
   fun(Pid) ->
-    spawn(?MODULE, start_acc, [Pid, WorkerFun, InitData])
+    spawn_link(?MODULE, start_acc, [Pid, WorkerFun, InitData])
   end.
 
 -spec start_acc(pid(), function(), term()) -> 'eos'.
@@ -54,9 +54,13 @@ make(WorkerFun, InitData) ->
 start_acc(NextPid, WorkerFun, InitData) ->
     {InFlight, FittingState} = WorkerFun({bp_init, InitData},
                                          ignored_placeholder),
-    %% ?VV("start_acc: inf ~w fs ~w\n", [InFlight, FittingState]),
+    %% ?VV("sink: inf ~w fs ~w\n", [InFlight, FittingState]),
     receive
-        {system, bp_upstream_fitting, UpstreamPid} ->
+        {system, bp_upstream_fitting, UpstreamPid, SourcePid, ChainPids} ->
+            %% ?VV("sink: send to source: ~p\n", [lists:reverse(ChainPids)]),
+            [link(Pid) || Pid <- [SourcePid|ChainPids]],
+            AllChainPids = lists:reverse([self()|ChainPids]),
+            SourcePid ! {system, bp_chain_pids, AllChainPids},
             %% ?VV("start_acc: my upstream is ~w\n", [UpstreamPid]),
             sk_utils:bp_signal_upstream(UpstreamPid, InFlight),
             loop_acc(UpstreamPid, NextPid, WorkerFun, FittingState)

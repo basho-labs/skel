@@ -44,7 +44,7 @@
 %% as an argument. 
 make(WorkerFun) ->
   fun(NextPid) ->
-    spawn(?MODULE, start, [WorkerFun, NextPid])
+    spawn_link(?MODULE, start, [WorkerFun, NextPid])
   end.
 
 -spec start(worker_fun(), pid()) -> eos.

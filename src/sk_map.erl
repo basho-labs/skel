@@ -55,8 +55,8 @@
 %% {@link sk_map_partitioner} process.
 make(WorkFlow) ->
   fun(NextPid) ->
-    CombinerPid = spawn(sk_map_combiner, start, [NextPid]),
-    spawn(sk_map_partitioner, start, [auto, WorkFlow, CombinerPid])
+    CombinerPid = spawn_link(sk_map_combiner, start, [NextPid]),
+    spawn_link(sk_map_partitioner, start, [auto, WorkFlow, CombinerPid])
   end.
 
 
@@ -71,9 +71,9 @@ make(WorkFlow) ->
 %% their Pids passed to a {@link sk_map_partitioner} process.
 make(WorkFlow, NWorkers) ->
   fun(NextPid) ->
-    CombinerPid = spawn(sk_map_combiner, start, [NextPid, NWorkers]),
+    CombinerPid = spawn_link(sk_map_combiner, start, [NextPid, NWorkers]),
     WorkerPids = sk_utils:start_workers(NWorkers, WorkFlow, CombinerPid),
-    spawn(sk_map_partitioner, start, [man, WorkerPids, CombinerPid])
+    spawn_link(sk_map_partitioner, start, [man, WorkerPids, CombinerPid])
   end.
 
 -spec make_hyb(workflow(), workflow(), pos_integer(), pos_integer()) -> maker_fun().
@@ -87,15 +87,15 @@ make(WorkFlow, NWorkers) ->
 %% their Pids passed to a {@link sk_map_partitioner} process.
 make_hyb(WorkFlowCPU, WorkFlowGPU, NCPUWorkers, NGPUWorkers) ->
   fun(NextPid) ->
-    CombinerPid = spawn(sk_map_combiner, start, [NextPid, NCPUWorkers+NGPUWorkers]),
+    CombinerPid = spawn_link(sk_map_combiner, start, [NextPid, NCPUWorkers+NGPUWorkers]),
     {CPUWorkerPids, GPUWorkerPids} = sk_utils:start_workers_hyb(NCPUWorkers, NGPUWorkers, WorkFlowCPU, WorkFlowGPU, CombinerPid),
-    spawn(sk_map_partitioner, start_hyb, [man, CPUWorkerPids, GPUWorkerPids, CombinerPid])
+    spawn_link(sk_map_partitioner, start_hyb, [man, CPUWorkerPids, GPUWorkerPids, CombinerPid])
   end.
 
 %make_hyb(WorkFlowCPU, WorkFlowGPU) ->
 %  fun(NextPid) ->
-%	  CombinerPid = spawn(sk_map_combiner, start, [NextPid]),
-%	  spawn(sk_map_partitioner, start, [auto, [{seq, fun(X) -> sk_utils:hyb_worker(WorkFlowCPU, WorkFlowGPU, X) end}], 
+%	  CombinerPid = spawn_link(sk_map_combiner, start, [NextPid]),
+%	  spawn_link(sk_map_partitioner, start, [auto, [{seq, fun(X) -> sk_utils:hyb_worker(WorkFlowCPU, WorkFlowGPU, X) end}], 
 %					    CombinerPid])
 %  end.
 

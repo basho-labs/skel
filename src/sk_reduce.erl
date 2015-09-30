@@ -32,7 +32,7 @@
 %% `NextPid'.
 make(Decomp, Reduce) ->
   fun(NextPid) ->
-    spawn(sk_reduce_decomp, start, [Decomp, Reduce, NextPid])
+    spawn_link(sk_reduce_decomp, start, [Decomp, Reduce, NextPid])
   end.
 
 % Implemented as a treefold underneath

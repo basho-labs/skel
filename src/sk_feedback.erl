@@ -37,8 +37,8 @@
 make(WorkFlow, FilterFun) ->
   fun(NextPid) ->
     Ref = make_ref(),
-    CounterPid = spawn(sk_feedback_bicounter, start, []),
-    FilterPid = spawn(sk_feedback_filter, start, [FilterFun, Ref, CounterPid, NextPid]),
+    CounterPid = spawn_link(sk_feedback_bicounter, start, []),
+    FilterPid = spawn_link(sk_feedback_filter, start, [FilterFun, Ref, CounterPid, NextPid]),
     WorkerPid = sk_utils:start_worker(WorkFlow, FilterPid), 
-    spawn(sk_feedback_receiver, start, [Ref, CounterPid, FilterPid, WorkerPid])
+    spawn_link(sk_feedback_receiver, start, [Ref, CounterPid, FilterPid, WorkerPid])
   end.

@@ -47,7 +47,7 @@
 %% to.
 make() ->
   fun(Pid) ->
-    spawn(?MODULE, start_acc, [Pid])
+    spawn_link(?MODULE, start_acc, [Pid])
   end.
 
 -spec make(module()) -> maker_fun().
@@ -56,7 +56,7 @@ make() ->
 %% the <tt>Pid</tt> of the process it is linked to.
 make(OutputMod) ->
   fun(Pid) ->
-    spawn(?MODULE, start_mod, [OutputMod, Pid])
+    spawn_link(?MODULE, start_mod, [OutputMod, Pid])
   end.
 
 -spec start_acc(pid()) -> 'eos'.

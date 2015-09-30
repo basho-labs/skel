@@ -29,28 +29,6 @@
 
 -spec test() -> term().
 
--spec smoke_seq_test() -> term().
-smoke_seq_test() ->
-    %% timer:sleep(50),?VV("\n", []), ?VV("smoke_seq_test top\n", []),
-    Inputs = [1,2,3,4,5],
-
-    X1 = skel:do([{seq, fun identity/1},
-                  {seq, fun double/1},
-                  {seq, fun half/1},
-                  {seq, fun truncate/1}], Inputs),
-    Inputs = X1.
-
--spec smoke_pipe_test() -> term().
-smoke_pipe_test() ->
-    Inputs = [1,2,3,4,5],
-
-    X1 = skel:do([{pipe,[{seq, fun identity/1},
-                         {seq, fun double/1},
-                         {seq, fun half/1},
-                         {seq, fun truncate/1}]
-                  }], Inputs),
-    Inputs = X1.
-
 -spec smoke_bp_sink_test() -> term().
 smoke_bp_sink_test() ->
     Inputs = lists:seq(1,20),
@@ -58,8 +36,8 @@ smoke_bp_sink_test() ->
     MyRef = make_ref(),
 
     %% timer:sleep(50),?VV("\n", []),?VV("smoke_bp_sink_test: top\n", []),
-    _X = skel:bp_do([{bp_sink, fun bp_demo_sink/2, {Me, MyRef}}], Inputs),
-    %% ?VV("smoke_bp_seq_test: X1 ~w\n", [X1]),
+    {_FeederPid, _WorkPids} =
+        skel:bp_do([{bp_sink, fun bp_demo_sink/2, {Me, MyRef}}], Inputs),
     Res1 = receive
                {sink_final_result, MyRef, Val} ->
                    Val
@@ -73,7 +51,8 @@ smoke_bp_seq_test() ->
     MyRef = make_ref(),
 
     %% timer:sleep(50),?VV("\n", []),?VV("smoke_bp_seq_test: top\n", []),
-    _X = skel:bp_do([{bp_seq, fun bp_demo_identity/2, init_data_ignored},
+    {_FeederPid, _WorkPids} =
+         skel:bp_do([{bp_seq, fun bp_demo_identity/2, init_data_ignored},
                      {bp_seq, fun bp_double/2, 22},
                      {bp_seq, fun bp_half/2, 77.4},
                      {bp_seq, fun bp_truncate/2, -2.22},
@@ -94,8 +73,8 @@ smoke_bp_seq_sleep_test_SKIP() ->
     Me = self(),
     MyRef = make_ref(),
 
-    timer:sleep(50),?VV("\n", []),?VV("smoke_bp_seq_sleep_test: top\n", []),
-    _X = skel:bp_do([{bp_seq, fun bp_verbose_sleep/2, 50},
+    {_FeederPid, _WorkPids} =
+         skel:bp_do([{bp_seq, fun bp_verbose_sleep/2, 50},
                      {bp_seq, fun bp_verbose_sleep/2, 70},
                      {bp_seq, fun bp_verbose_sleep/2, 90},
                      {bp_seq, fun bp_verbose_sleep/2, 0},
@@ -116,18 +95,41 @@ smoke_bp_crash1_test() ->
     Inputs = lists:seq(1, CrashAfter+2),  % We'll crash if length >= CrashAfter
     Me = self(),
     MyRef = make_ref(),
+    process_flag(trap_exit, true),
 
     try
-       _X = skel:bp_do([{bp_seq, fun bp_crash_after/2, {CrashAfter,ExitReason}},
+        {FeederPid, WorkPids} =
+            skel:bp_do([{bp_seq, fun bp_demo_identity/2, init_data_ignored},
                         {bp_seq, fun bp_demo_identity/2, init_data_ignored},
-                        {bp_sink, fun bp_demo_sink/2, {Me,MyRef}}], Inputs),
-       Res2 = receive
-                  {sink_final_result, MyRef, Val} ->
-                      Val
-              end,
-        exit({should_have_crashed, res2, Res2})
-    catch exit:ExitReason ->
-            ok
+                        {bp_seq, fun bp_crash_after/2, {CrashAfter,ExitReason}},
+                        {bp_seq, fun bp_demo_identity/2, init_data_ignored},
+                        {bp_sink,fun bp_demo_sink/2, {Me,MyRef}}], Inputs),
+        Pids = [FeederPid|WorkPids],
+        [ok = poll_until_pid_dead(P) || P <- Pids],
+        Statuses = [begin
+                        Status = receive {'EXIT', P, Why} -> Why end,
+                        %% ?VV("Worker ~p exited ~p\n", [P, Status]),
+                        Status
+                    end || P <- Pids],
+        true = lists:any(fun(X) -> X == ExitReason end, Statuses),
+        receive
+            {sink_final_result, MyRef, Val} ->
+                exit({should_have_crashed, val, Val})
+        after 50 ->
+                %% We confirmed that everyone is dead, so waiting more
+                %% than 0 msec for a bogus sink_final_result is overkill.
+                ok
+        end
+    after
+        process_flag(trap_exit, false)
+    end.
+
+poll_until_pid_dead(Pid) ->
+    case erlang:is_process_alive(Pid) of
+        false ->
+            ok;
+        _ ->
+            timer:sleep(10)
     end.
 
 identity(X) ->
@@ -151,6 +153,7 @@ truncate(X) ->
          }).
 
 bp_demo_identity({bp_init, _Data}, _Ignore) ->
+    %% ?VV("identity bp_init\n", []),
     InFlight = 2,
     {InFlight, #demo{acc=0, downstream=undefined}};
 bp_demo_identity({bp_downstream, DownStream}, S) ->
@@ -159,12 +162,13 @@ bp_demo_identity(bp_eoi, #demo{acc=_Acc}=S) ->
     %% ?VV("identity bp_eoi: Acc ~w\n", [_Acc]),
     {ok, S};
 bp_demo_identity(X, #demo{acc=Acc}=S) ->
+    %% ?VV("identity bp_init: X ~p my links ~p\n", [X, process_info(self(), links)]),
     Res = X,
     %% ?VV("identity: X ~w -> ~w\n", [X, Res]),
     {[Res], S#demo{acc=Acc+Res}}.
 
 bp_demo_sink({bp_init, {_,_}=MyParent}, _Ignore) ->
-    %% ?VV("sink bp_init: ~w\n", [MyParent]),
+    %% ?VV("sink bp_init: my links ~w\n", [process_info(self(), links)]),
     InFlight = 2,
     {InFlight, {[], MyParent}};
 bp_demo_sink({bp_init, Bad}, _Ignore) ->
@@ -219,9 +223,9 @@ bp_verbose_sleep({bp_downstream, DownStream}, S) ->
 bp_verbose_sleep(bp_eoi, S) ->
     {ok, S};
 bp_verbose_sleep(X, #demo{acc=SleepTime}=S) ->
-    ?VV("verbose sleep: got ~p, my time = ~w\n", [X, SleepTime]),
+    %% ?VV("verbose sleep: got ~p, my time = ~w\n", [X, SleepTime]),
     timer:sleep(SleepTime),
-    ?VV("verbose sleep: done\n", []),
+    %% ?VV("verbose sleep: done\n", []),
     Emits = if SleepTime == 0 -> [];
                true           -> [X]
             end,
@@ -235,18 +239,21 @@ bp_verbose_sleep(X, #demo{acc=SleepTime}=S) ->
          }).
 
 bp_crash_after({bp_init, {Limit,Reason}}, _Ignore) ->
+    %% ?VV("crash bp_init: my links ~p\n", [process_info(self(), links)]),
     InFlight = 2,
     {InFlight, #crash{limit=Limit, reason=Reason,
                       count=0, downstream=undefined}};
 bp_crash_after({bp_downstream, DownStream}, S) ->
     {ok, S#crash{downstream=DownStream}};
 bp_crash_after(bp_eoi, #crash{count=Count}=S) ->
-    ?VV("bp_crash_after: EIO count = ~w\n", [Count]),
+    %% ?VV("bp_crash_after: EIO count = ~w\n", [Count]),
     {ok, S};
 bp_crash_after(X, #crash{limit=Limit, count=Count, reason=Reason}=S) ->
-    %% ?VV("crash_after X ~w Count ~w\n", [X, Count]),
-    if Count >= Limit -> exit(Reason);
-       true           -> ok
+    %% ?VV("crash_after X ~w Count ~w reason ~w\n", [X, Count, Reason]),
+    if Count >= Limit ->
+            %% ?VV("crasher: gonna crash now, my links = ~w\n", [process_info(self(), links)]),
+            exit(Reason);
+       true -> ok
     end,
     {[X], S#crash{count=Count+1}}.
 

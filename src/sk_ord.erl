@@ -40,7 +40,7 @@
 %% specified workflow are in the same order as that of its inputs.
 make(WorkFlow) ->
   fun(NextPid) ->
-    ReordererPid = spawn(sk_ord_reorderer, start, [NextPid]),
+    ReordererPid = spawn_link(sk_ord_reorderer, start, [NextPid]),
     WorkerPid = sk_utils:start_worker(WorkFlow, ReordererPid),
-    spawn(sk_ord_tagger, start, [WorkerPid])
+    spawn_link(sk_ord_tagger, start, [WorkerPid])
   end.

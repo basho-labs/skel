@@ -48,7 +48,7 @@
 %% as an argument. 
 make(WorkerFun, InitData) ->
     fun(NextPid) ->
-            spawn(?MODULE, start, [NextPid, WorkerFun, InitData])
+            spawn_link(?MODULE, start, [NextPid, WorkerFun, InitData])
     end.
 
 -spec start(pid(), worker_fun(), init_data()) -> eos.
@@ -58,11 +58,13 @@ start(NextPid, WorkerFun, InitData) ->
     sk_tracer:t(75, self(), {?MODULE, start}, [{next_pid, NextPid}]),
     {InFlight, FittingState} = WorkerFun({bp_init, InitData},
                                          ignored_placeholder),
-    %% ?VV("start_acc: inf ~w fs ~w\n", [InFlight, FittingState]),
+    %% ?VV("bp_seq start: inf ~w fs ~w\n", [InFlight, FittingState]),
     receive
-        {system, bp_upstream_fitting, UpstreamPid} ->
+        {system, bp_upstream_fitting, UpstreamPid, SourcePid, ChainPids} ->
             %% ?VV("start: my upstream is ~w\n", [UpstreamPid]),
-            NextPid ! {system, bp_upstream_fitting, self()},
+            link(SourcePid),
+            NextPid ! {system, bp_upstream_fitting, self(),
+                       SourcePid, [self()|ChainPids]},
             sk_utils:bp_signal_upstream(UpstreamPid, InFlight),
             loop(UpstreamPid, NextPid, WorkerFun, FittingState, 0)
     end.

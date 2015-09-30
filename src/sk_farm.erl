@@ -32,16 +32,16 @@
 %% inner-workflows, respectively.
 make(NWorkers, WorkFlow) ->
   fun(NextPid) ->
-    CollectorPid = spawn(sk_farm_collector, start, [NWorkers, NextPid]),
+    CollectorPid = spawn_link(sk_farm_collector, start, [NWorkers, NextPid]),
     WorkerPids = sk_utils:start_workers(NWorkers, WorkFlow, CollectorPid),
-    spawn(sk_farm_emitter, start, [WorkerPids])
+    spawn_link(sk_farm_emitter, start, [WorkerPids])
   end.
 
 -spec make_hyb(pos_integer(), pos_integer(), workflow(), workflow()) -> maker_fun().
 make_hyb(NCPUWorkers, NGPUWorkers, WorkFlowCPU, WorkFlowGPU) ->
   fun(NextPid) ->
-    CollectorPid = spawn(sk_farm_collector, start, [NCPUWorkers+NGPUWorkers, NextPid]),
+    CollectorPid = spawn_link(sk_farm_collector, start, [NCPUWorkers+NGPUWorkers, NextPid]),
     WorkerPids = sk_utils:start_workers_hyb(NCPUWorkers, NGPUWorkers, WorkFlowCPU, WorkFlowGPU, 
                                             CollectorPid),
-    spawn(sk_farm_emitter, start, [WorkerPids])
+    spawn_link(sk_farm_emitter, start, [WorkerPids])
   end.

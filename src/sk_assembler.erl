@@ -15,7 +15,7 @@
 -export([
          make/2
 	,make_hyb/4
-        ,run/3
+        ,run/4
         ]).
 
 -include("skel.hrl").
@@ -40,16 +40,16 @@ make_hyb(WorkFlow, EndPid, NCPUWorkers, NGPUWorkers) when is_pid(EndPid) ->
   lists:foldr(fun(MakeFn, Pid) -> MakeFn(Pid) end, EndPid, MakeFns).
     
 
--spec run(pid() | workflow(), input(), boolean()) -> pid().
+-spec run(pid() | workflow(), input(), boolean(), pid()) -> pid().
 %% @doc Function to produce and start a set of processes according to the 
 %% given workflow specification and input.
-run(WorkFlow, Input, FlowControl_p) when is_pid(WorkFlow) ->
-  Feeder = sk_source:make(Input, FlowControl_p),
+run(WorkFlow, Input, FlowControl_p, WhoToNotify) when is_pid(WorkFlow) ->
+  Feeder = sk_source:make(Input, FlowControl_p, WhoToNotify),
   Feeder(WorkFlow);
-run(WorkFlow, Input, FlowControl_p) when is_list(WorkFlow) ->
+run(WorkFlow, Input, FlowControl_p, WhoToNotify) when is_list(WorkFlow) ->
   DrainPid = (sk_sink:make())(self()),
   AssembledWF = make(WorkFlow, DrainPid),
-  run(AssembledWF, Input, FlowControl_p).
+  run(AssembledWF, Input, FlowControl_p, WhoToNotify).
 
 parse_hyb(Section, NCPUWorkers, NGPUWorkers) ->
     case Section of
@@ -62,14 +62,16 @@ parse_hyb(Section, NCPUWorkers, NGPUWorkers) ->
 -spec parse(wf_item()) -> maker_fun().
 %% @doc Determines the course of action to be taken according to the type of 
 %% workflow specified. Constructs and starts specific skeleton instances.
-parse(Fun) when is_function(Fun, 1) ->
-  parse({seq, Fun});
-parse({seq, Fun}) when is_function(Fun, 1) ->
-  sk_seq:make(Fun);
 parse({bp_seq, Fun, InitData}) when is_function(Fun, 2) ->
   sk_bp_seq:make(Fun, InitData);
 parse({bp_sink, Fun, InitData}) when is_function(Fun, 2) ->
   sk_bp_sink:make(Fun, InitData);
+parse(X) when X /= gonna_warn_you ->
+  exit("Do you know how broken the rest of this code is?");
+parse(Fun) when is_function(Fun, 1) ->
+  parse({seq, Fun});
+parse({seq, Fun}) when is_function(Fun, 1) ->
+  sk_seq:make(Fun);
 parse({pipe, WorkFlow}) ->
   sk_pipe:make(WorkFlow);
 parse({ord, WorkFlow}) ->
