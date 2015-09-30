@@ -109,6 +109,27 @@ smoke_bp_seq_sleep_test_SKIP() ->
     %% to completion, yay!
     [] = Res2.
 
+-spec smoke_bp_crash1_test() -> term().
+smoke_bp_crash1_test() ->
+    CrashAfter = 5,
+    ExitReason = goodie_we_get_to_crash,
+    Inputs = lists:seq(1, CrashAfter+2),  % We'll crash if length >= CrashAfter
+    Me = self(),
+    MyRef = make_ref(),
+
+    try
+       _X = skel:bp_do([{bp_seq, fun bp_crash_after/2, {CrashAfter,ExitReason}},
+                        {bp_seq, fun bp_demo_identity/2, init_data_ignored},
+                        {bp_sink, fun bp_demo_sink/2, {Me,MyRef}}], Inputs),
+       Res2 = receive
+                  {sink_final_result, MyRef, Val} ->
+                      Val
+              end,
+        exit({should_have_crashed, res2, Res2})
+    catch exit:ExitReason ->
+            ok
+    end.
+
 identity(X) ->
     X.
 
@@ -205,5 +226,28 @@ bp_verbose_sleep(X, #demo{acc=SleepTime}=S) ->
                true           -> [X]
             end,
     {Emits, S}.
+
+-record(crash, {
+          limit  :: non_neg_integer(),
+          count  :: non_neg_integer(),
+          reason :: term(),
+          downstream :: pid()
+         }).
+
+bp_crash_after({bp_init, {Limit,Reason}}, _Ignore) ->
+    InFlight = 2,
+    {InFlight, #crash{limit=Limit, reason=Reason,
+                      count=0, downstream=undefined}};
+bp_crash_after({bp_downstream, DownStream}, S) ->
+    {ok, S#crash{downstream=DownStream}};
+bp_crash_after(bp_eoi, #crash{count=Count}=S) ->
+    ?VV("bp_crash_after: EIO count = ~w\n", [Count]),
+    {ok, S};
+bp_crash_after(X, #crash{limit=Limit, count=Count, reason=Reason}=S) ->
+    %% ?VV("crash_after X ~w Count ~w\n", [X, Count]),
+    if Count >= Limit -> exit(Reason);
+       true           -> ok
+    end,
+    {[X], S#crash{count=Count+1}}.
 
 -endif. % TEST
