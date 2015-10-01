@@ -55,9 +55,10 @@ start(NextPid, InFlight, WorkerFun, InitData) ->
     sk_tracer:t(75, self(), {?MODULE, start}, [{next_pid, NextPid}]),
     {ok, FittingState} = WorkerFun({bp_init, InitData}, ignored_placeholder),
     %% ?VV("bp_seq start: inf ~w fs ~w\n", [InFlight, FittingState]),
+    %% ?VV("bp_seq start: NextPid ~w\n", [NextPid]),
     receive
         {system, bp_upstream_fitting, UpstreamPid, SourcePid, ChainPids} ->
-            %% ?VV("start: my upstream is ~w\n", [UpstreamPid]),
+            %% ?VV("start: my upstream is ~w, nextpid is ~w\n", [UpstreamPid, NextPid]),
             link(SourcePid),
             NextPid ! {system, bp_upstream_fitting, self(), SourcePid,
                        [self()|ChainPids]},

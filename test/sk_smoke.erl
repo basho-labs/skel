@@ -127,32 +127,56 @@ smoke_bp_crash1_test() ->
 
 -spec smoke_bp_farm1_test() -> term().
 smoke_bp_farm1_test() ->
-    Inputs = lists:seq(1,20),
+    Inputs = lists:seq(1,500),
     NWorkers = 5,
     Me = self(),
     MyRef = make_ref(),
 
-    Farm = {bp_farm, 2,
-            [{bp_seq, 1, fun bp_double/2, 22},
-             {bp_seq, 1, fun bp_half/2, 77.4},
-             {bp_seq, 1, fun bp_truncate/2, -2.22}], NWorkers},
-    ResFun = fun() -> receive {sink_final_result, MyRef, Val} -> Val end end,
+    Farm1 = {bp_farm, 2,
+             [{bp_seq, 1, fun bp_double/2, 22},
+              {bp_seq, 1, fun bp_half/2, 77.4},
+              {bp_seq, 1, fun bp_truncate/2, -2.22}], NWorkers},
+    GetRes = fun() -> receive {sink_final_result, MyRef, Val} -> Val end end,
 
-    %% timer:sleep(50),?VV("\n", []),?VV("smoke_bp_farm1_test: top\n", []),
     {_FeederPid1, _WorkPids1} =
          skel:bp_do([{bp_seq,  2, fun bp_demo_identity/2, init_data_ignored},
-                     Farm,
+                     Farm1,
                      {bp_sink, 2, fun bp_demo_sink/2, {Me,MyRef}}], Inputs),
-    Res1 = ResFun(),
-    Inputs = Res1,
+    %% ?VV("Feeder ~p WorkPids ~p\n", [_FeederPid1, _WorkPids1]),
+    Res1 = GetRes(),
+    %% Results can arrive out of order, so we sort them for the match
+    Inputs = lists:sort(Res1),
 
     %% Same thing but with farm at beginning of the workflow.
     {_FeederPid2, _WorkPids2} =
-         skel:bp_do([Farm,
+         skel:bp_do([Farm1,
                      {bp_seq,  2, fun bp_demo_identity/2, init_data_ignored},
+                     Farm1,
                      {bp_sink, 2, fun bp_demo_sink/2, {Me,MyRef}}], Inputs),
-    Res2 = ResFun(),
-    Inputs = Res2.
+    Res2 = GetRes(),
+    %% Results can arrive out of order, so we sort them for the match
+    Inputs = lists:sort(Res2),
+
+    %% Farm2 = {bp_farm, 2,
+    %%          [{bp_seq, 1, fun bp_half/2, 77.4},
+    %%           %% Farm1,
+    %%           %% {bp_seq, 1, fun bp_half/2, 77.4},
+    %%           %% Farm1,
+    %%           %% {bp_seq, 1, fun bp_double/2, 22},
+    %%           %% Farm1,
+    %%           %% {bp_seq, 1, fun bp_double/2, 22},
+    %%           Farm1,
+    %%           {bp_seq, 1, fun bp_truncate/2, -2.22}], NWorkers*2},
+    %% {_FeederPid3, _WorkPids3} =
+    %%      skel:bp_do([Farm2,
+    %%                  {bp_seq,  2, fun bp_demo_identity/2, init_data_ignored},
+    %%                  Farm2,
+    %%                  {bp_sink, 2, fun bp_demo_sink/2, {Me,MyRef}}], Inputs),
+    %% Res3 = GetRes(),
+    %% %% Results can arrive out of order, so we sort them for the match
+    %% Inputs = lists:sort(Res3),
+
+    ok.
 
 poll_until_pid_dead(Pid) ->
     case erlang:is_process_alive(Pid) of

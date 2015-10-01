@@ -33,7 +33,7 @@ start(InFlight, Workers, CollectorPid) ->
     sk_tracer:t(75, self(), {?MODULE, start}, [{workers, Workers}]),
     receive
         {system, bp_upstream_fitting, UpstreamPid, SourcePid, ChainPids} ->
-            ?VV("start: my upstream is ~w\n", [UpstreamPid]),
+            %% ?VV("start: my upstream is ~w\n", [UpstreamPid]),
             link(SourcePid),
             %% Use the dummy indicator 'farm' to signal to collector
             [Pid ! {system, bp_upstream_fitting, self(), SourcePid, [farm]} ||

@@ -43,32 +43,43 @@ start(NWorkers, NextPid) ->
 %% forwards, any output messages from the inner-workflow. Halts when the `eos' 
 %% system message is received, and only one active worker process remains.
 loop(NWorkers, NextPid) ->
-  receive
-    {data, _, _, _} = DataMessage ->
-      sk_tracer:t(50, self(), NextPid, {?MODULE, data}, [{input, DataMessage}]),
-      NextPid ! DataMessage,
-      loop(NWorkers, NextPid);
-    {system, eos} when NWorkers =< 1 ->
-      sk_tracer:t(75, self(), NextPid, {?MODULE, system}, [{msg, eos}, {remaining, 0}]),
-      NextPid ! {system, eos},
-      eos;
-    {system, eos} ->
-      sk_tracer:t(85, self(), {?MODULE, system}, [{msg, eos}, {remaining, NWorkers-1}]),
-      loop(NWorkers-1, NextPid)
-  end.
+    receive
+        {data, WorkerPid, _, _} = DataMessage ->
+            sk_utils:bp_signal_upstream(WorkerPid, 1),
+            sk_tracer:t(50, self(), NextPid, {?MODULE, data}, [{input, DataMessage}]),
+            NextPid ! DataMessage,
+            loop(NWorkers, NextPid);
+        {system, eos} when NWorkers =< 1 ->
+            sk_tracer:t(75, self(), NextPid, {?MODULE, system}, [{msg, eos}, {remaining, 0}]),
+            NextPid ! {system, eos},
+            eos;
+        {system, eos} ->
+            sk_tracer:t(85, self(), {?MODULE, system}, [{msg, eos}, {remaining, NWorkers-1}]),
+            loop(NWorkers-1, NextPid)
+    end.
 
 get_worker_pids(0) ->
     [];
 get_worker_pids(N) ->
     receive
-        {system, bp_upstream_fitting, WorkerPid, _SourcePid, [_,farm]} ->
-            link(WorkerPid),
-            [WorkerPid|get_worker_pids(N - 1)]
+        {system, bp_upstream_fitting, WorkerPid, _SourcePid, FarmPids}=Msg ->
+            case lists:member(farm, FarmPids) of
+                true ->
+                    %% ?VV("start: my worker upstream is ~w\n", [WorkerPid]),
+                    link(WorkerPid),
+                    (FarmPids -- [farm]) ++ get_worker_pids(N - 1);
+                false ->
+                    %% ?VV("ooo ~w\n", [Msg]),
+                    %% Out of order, handle it later
+                    self() ! Msg,
+                    get_worker_pids(N)
+            end
     end.
 
 handle_last_upstream_fitting_msg(Workers, NextPid) ->
     receive
         {system, bp_upstream_fitting, EmitterPid, SourcePid, ChainPids} ->
+            %% ?VV("start: my emitter upstream is ~w\n", [EmitterPid]),
             false = lists:member(farm, ChainPids), % sanity check
             link(EmitterPid),
             NextPid ! {system, bp_upstream_fitting, self(), SourcePid,

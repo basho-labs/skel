@@ -53,11 +53,10 @@ start(NextPid, InFlight, WorkerFun, InitData) ->
     %% ?VV("sink: inf ~w fs ~w\n", [InFlight, FittingState]),
     receive
         {system, bp_upstream_fitting, UpstreamPid, SourcePid, ChainPids} ->
-            %% ?VV("sink: send to source: ~p\n", [lists:reverse(ChainPids)]),
+            %% ?VV("start: my upstream is ~w\n", [UpstreamPid]),
             [link(Pid) || Pid <- [SourcePid|ChainPids]],
             AllChainPids = lists:reverse([self()|ChainPids]),
             SourcePid ! {system, bp_chain_pids, AllChainPids},
-            %% ?VV("start: my upstream is ~w\n", [UpstreamPid]),
             sk_utils:bp_signal_upstream(UpstreamPid, InFlight),
             loop(UpstreamPid, NextPid, WorkerFun, FittingState)
     end.
