@@ -61,25 +61,19 @@ loop(NWorkers, NextPid) ->
 get_worker_pids(0) ->
     [];
 get_worker_pids(N) ->
+    Me = self(),
     receive
-        {system, bp_upstream_fitting, WorkerPid, _SourcePid, FarmPids}=Msg ->
-            case lists:member(farm, FarmPids) of
-                true ->
-                    %% ?VV("start: my worker upstream is ~w\n", [WorkerPid]),
-                    link(WorkerPid),
-                    (FarmPids -- [farm]) ++ get_worker_pids(N - 1);
-                false ->
-                    %% ?VV("ooo ~w\n", [Msg]),
-                    %% Out of order, handle it later
-                    self() ! Msg,
-                    get_worker_pids(N)
-            end
+        {system, bp_upstream_fitting, WorkerPid, SourcePid, FarmPids}=Msg
+          when SourcePid == Me ->
+            ?VV("start: my worker upstream is ~w\n", [WorkerPid]),
+            link(WorkerPid),
+            FarmPids ++ get_worker_pids(N - 1)
     end.
 
 handle_last_upstream_fitting_msg(Workers, NextPid) ->
     receive
         {system, bp_upstream_fitting, EmitterPid, SourcePid, ChainPids} ->
-            %% ?VV("start: my emitter upstream is ~w\n", [EmitterPid]),
+            ?VV("start: my emitter upstream is ~w\n", [EmitterPid]),
             false = lists:member(farm, ChainPids), % sanity check
             link(EmitterPid),
             NextPid ! {system, bp_upstream_fitting, self(), SourcePid,

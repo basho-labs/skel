@@ -79,5 +79,6 @@ loop(UpstreamPid, NextPid, WorkerFun, FittingState) ->
             sk_tracer:t(75, self(), {?MODULE, system}, [{msg, eos}]),
             %% ?VV("loop received eos\n", []),
             {ok, _FittingState2} = WorkerFun(bp_eoi, FittingState),
+            NextPid ! {system, eos},
             eos
     end.

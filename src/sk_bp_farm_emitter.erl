@@ -35,8 +35,8 @@ start(InFlight, Workers, CollectorPid) ->
         {system, bp_upstream_fitting, UpstreamPid, SourcePid, ChainPids} ->
             %% ?VV("start: my upstream is ~w\n", [UpstreamPid]),
             link(SourcePid),
-            %% Use the dummy indicator 'farm' to signal to collector
-            [Pid ! {system, bp_upstream_fitting, self(), SourcePid, [farm]} ||
+            %% Use sourcePid=CollectorPid to signal to farm_collector
+            [Pid ! {system, bp_upstream_fitting, self(), CollectorPid, []} ||
                 Pid <- Workers],
             %% Send the "real" bp_upstream_fitting message directly to
             %% collector.
@@ -61,8 +61,10 @@ loop(UpstreamPid, Workers, CollectorPid) ->
                     loop(UpstreamPid, Workers, CollectorPid)
             end;
         {system, eos} ->
+            ?VV("eos: workers ~w\n", [Workers]),
             sk_utils:stop_workers(?MODULE, Workers),
-            [sk_utils:wait_until_dead(Pid) || Pid <- Workers],
-            CollectorPid ! eos,
+            %% [sk_utils:wait_until_dead(Pid) || Pid <- Workers],
+            %% ?VV("eos: collector ~w\n", [CollectorPid]),
+            %% CollectorPid ! eos,
             eos
     end.

@@ -127,11 +127,12 @@ smoke_bp_crash1_test() ->
 
 -spec smoke_bp_farm1_test() -> term().
 smoke_bp_farm1_test() ->
-    Inputs = lists:seq(1,500),
+    Inputs = lists:seq(1,50),
     NWorkers = 5,
     Me = self(),
     MyRef = make_ref(),
 
+P1 = length(processes()),
     Farm1 = {bp_farm, 2,
              [{bp_seq, 1, fun bp_double/2, 22},
               {bp_seq, 1, fun bp_half/2, 77.4},
@@ -157,24 +158,27 @@ smoke_bp_farm1_test() ->
     %% Results can arrive out of order, so we sort them for the match
     Inputs = lists:sort(Res2),
 
-    %% Farm2 = {bp_farm, 2,
-    %%          [{bp_seq, 1, fun bp_half/2, 77.4},
-    %%           %% Farm1,
-    %%           %% {bp_seq, 1, fun bp_half/2, 77.4},
-    %%           %% Farm1,
-    %%           %% {bp_seq, 1, fun bp_double/2, 22},
-    %%           %% Farm1,
-    %%           %% {bp_seq, 1, fun bp_double/2, 22},
-    %%           Farm1,
-    %%           {bp_seq, 1, fun bp_truncate/2, -2.22}], NWorkers*2},
-    %% {_FeederPid3, _WorkPids3} =
-    %%      skel:bp_do([Farm2,
-    %%                  {bp_seq,  2, fun bp_demo_identity/2, init_data_ignored},
-    %%                  Farm2,
-    %%                  {bp_sink, 2, fun bp_demo_sink/2, {Me,MyRef}}], Inputs),
-    %% Res3 = GetRes(),
-    %% %% Results can arrive out of order, so we sort them for the match
-    %% Inputs = lists:sort(Res3),
+timer:sleep(50), io:format(user, "\n\n\n", []),
+    Farm2 = {bp_farm, 2,
+             [Farm1,
+              {bp_seq, 1, fun bp_double/2, 22},
+              {bp_seq, 1, fun bp_double/2, 22},
+              Farm1,
+              {bp_seq, 1, fun bp_half/2, 77.4},
+              {bp_seq, 1, fun bp_half/2, 77.4},
+              %% Farm1,
+              {bp_seq, 1, fun bp_truncate/2, -2.22}], NWorkers*2},
+    {_FeederPid3, _WorkPids3} =
+         skel:bp_do([Farm2,
+                     {bp_seq,  2, fun bp_demo_identity/2, init_data_ignored},
+                     Farm2,
+                     {bp_sink, 2, fun bp_demo_sink/2, {Me,MyRef}}], Inputs),
+    Res3 = GetRes(),
+    %% Results can arrive out of order, so we sort them for the match
+?VV("Res ~w\n", [lists:sort(Res3)]),
+    Inputs = lists:sort(Res3),
+P2 = length(processes()),
+?VV("P1 ~w P2 ~w\n", [P1, P2]),
 
     ok.
 
