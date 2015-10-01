@@ -50,6 +50,7 @@ make(Input, FlowControl_p, WhoToNotify) ->
 %% @todo add documentation for the callback loop
 -spec start(input(), pid(), boolean(), pid()) -> 'eos'.
 start(Input, NextPid, FlowControl_p, WhoToNotify) when is_list(Input) ->
+    %% ?VV("start NextPid = ~p\n", [NextPid]),
     NextPid ! {system, bp_upstream_fitting, self(), self(), []},
     receive
         {system, bp_chain_pids, ChainPids} ->

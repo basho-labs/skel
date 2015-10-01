@@ -132,7 +132,6 @@ smoke_bp_farm1_test() ->
     Me = self(),
     MyRef = make_ref(),
 
-P1 = length(processes()),
     Farm1 = {bp_farm, 2,
              [{bp_seq, 1, fun bp_double/2, 22},
               {bp_seq, 1, fun bp_half/2, 77.4},
@@ -158,7 +157,6 @@ P1 = length(processes()),
     %% Results can arrive out of order, so we sort them for the match
     Inputs = lists:sort(Res2),
 
-timer:sleep(50), io:format(user, "\n\n\n", []),
     Farm2 = {bp_farm, 2,
              [Farm1,
               {bp_seq, 1, fun bp_double/2, 22},
@@ -175,10 +173,33 @@ timer:sleep(50), io:format(user, "\n\n\n", []),
                      {bp_sink, 2, fun bp_demo_sink/2, {Me,MyRef}}], Inputs),
     Res3 = GetRes(),
     %% Results can arrive out of order, so we sort them for the match
-?VV("Res ~w\n", [lists:sort(Res3)]),
     Inputs = lists:sort(Res3),
-P2 = length(processes()),
-?VV("P1 ~w P2 ~w\n", [P1, P2]),
+
+    Inputsx = lists:duplicate(123, [q]),
+    Farm0x = {bp_farm, 2,
+              [{bp_seq, 1, fun bp_prepend/2, -1},
+               {bp_seq, 1, fun bp_prepend/2, -2},
+               {bp_seq, 1, fun bp_prepend/2, -3}], NWorkers},
+    Farm1x = {bp_farm, 2,
+              [{bp_seq, 1, fun bp_prepend/2, 1},
+               Farm0x,
+               {bp_seq, 1, fun bp_prepend/2, 2},
+               {bp_seq, 1, fun bp_prepend/2, 3}], NWorkers},
+    Farm2x = {bp_farm, 2,
+              [Farm1x,
+               {bp_seq, 1, fun bp_prepend/2, 10},
+               {bp_seq, 1, fun bp_prepend/2, 11},
+               Farm1x,
+               {bp_seq, 1, fun bp_prepend/2, 12},
+               {bp_seq, 1, fun bp_prepend/2, 13},
+               Farm1x,
+               {bp_seq, 1, fun bp_prepend/2, 14}], NWorkers*2},
+    {_FeederPid4, _WorkPids4} =
+        skel:bp_do([Farm2x,
+                    {bp_sink, 2, fun bp_demo_sink/2, {Me,MyRef}}], Inputsx),
+    Res3x = GetRes(),
+    %% Results can arrive out of order, so we sort them for the match
+    1 = length(lists:usort(Res3x)),
 
     ok.
 
@@ -277,5 +298,13 @@ bp_crash_after(X, #crash{limit=Limit, count=Count, reason=Reason}=S) ->
        true -> ok
     end,
     {[X], S#crash{count=Count+1}}.
+
+bp_prepend({bp_init, Data}, _Ignore) ->
+    {ok, Data};
+bp_prepend(bp_eoi, S) ->
+    {ok, S};
+bp_prepend(List, S) ->
+    Res = [S|List],
+    {[Res], S}.
 
 -endif. % TEST

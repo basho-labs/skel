@@ -31,9 +31,14 @@
 %% @doc Initialises a Farm skeleton given the number of workers and their 
 %% inner-workflows, respectively.
 make(InFlight, WorkFlow, NWorkers) ->
-  fun(NextPid) ->
-    CollectorPid = spawn_link(sk_bp_farm_collector, start, [NWorkers, NextPid]),
-    WorkerPids = sk_utils:start_workers(NWorkers, WorkFlow, CollectorPid),
-    spawn_link(sk_bp_farm_emitter, start, [InFlight, WorkerPids, CollectorPid])
+    fun(NextPid) ->
+            CollectorPid = spawn_link(sk_bp_farm_collector, start,
+                                      [NWorkers, NextPid]),
+            WorkerPids = sk_utils:start_workers(NWorkers, WorkFlow,
+                                                CollectorPid),
+            EmitterPid = spawn_link(sk_bp_farm_emitter, start,
+                                    [InFlight, WorkerPids, CollectorPid]),
+            %% ?VV("make farm: ~w -> ~w -> ~w\n", [EmitterPid, WorkerPids, CollectorPid]),
+            EmitterPid
   end.
 

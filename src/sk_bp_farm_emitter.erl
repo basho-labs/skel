@@ -30,6 +30,7 @@
 %%       and we will forward them to our upstream.  Therefore, the total
 %%       number of inflight will be our inflight + # of workers.
 start(InFlight, Workers, CollectorPid) ->
+    %% ?VV("start Workers = ~p\n", [Workers]),
     sk_tracer:t(75, self(), {?MODULE, start}, [{workers, Workers}]),
     receive
         {system, bp_upstream_fitting, UpstreamPid, SourcePid, ChainPids} ->
@@ -49,11 +50,12 @@ start(InFlight, Workers, CollectorPid) ->
 loop(UpstreamPid, Workers, CollectorPid) ->
     receive
         {system, bp_want, WorkerPid, N} when N > 1 ->
-            %% If this ever happens, "convert" to N=1 messages to make the
+            %% ?VV("got bp_want from ~w for ~w\n", [WorkerPid, N]),
+            %% If this happens, "convert" to N=1 messages to make the
             %% rest of our code simpler.
             [self() ! {system, bp_want, WorkerPid, 1} || _ <- lists:seq(1,N)],
             loop(UpstreamPid, Workers, CollectorPid);
-        {data, _, _, _} = DataMessage ->
+        {data, FromPid, _, _} = DataMessage ->
             sk_utils:bp_signal_upstream(UpstreamPid, 1),
             receive
                 {system, bp_want, WorkerPid, 1} ->
@@ -61,7 +63,7 @@ loop(UpstreamPid, Workers, CollectorPid) ->
                     loop(UpstreamPid, Workers, CollectorPid)
             end;
         {system, eos} ->
-            ?VV("eos: workers ~w\n", [Workers]),
+            %% ?VV("eos: workers ~w\n", [Workers]),
             sk_utils:stop_workers(?MODULE, Workers),
             %% [sk_utils:wait_until_dead(Pid) || Pid <- Workers],
             %% ?VV("eos: collector ~w\n", [CollectorPid]),

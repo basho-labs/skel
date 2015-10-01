@@ -52,10 +52,10 @@ make(InFlight, WorkerFun, InitData) ->
 %% @doc Starts the worker process' task. Recursively receives the worker 
 %% function's input, and applies it to said function.
 start(NextPid, InFlight, WorkerFun, InitData) ->
+    %% ?VV("start NextPid = ~p\n", [NextPid]),
     sk_tracer:t(75, self(), {?MODULE, start}, [{next_pid, NextPid}]),
     {ok, FittingState} = WorkerFun({bp_init, InitData}, ignored_placeholder),
     %% ?VV("bp_seq start: inf ~w fs ~w\n", [InFlight, FittingState]),
-    %% ?VV("bp_seq start: NextPid ~w\n", [NextPid]),
     receive
         {system, bp_upstream_fitting, UpstreamPid, SourcePid, ChainPids} ->
             %% ?VV("start: my upstream is ~w, nextpid is ~w\n", [UpstreamPid, NextPid]),
@@ -80,7 +80,8 @@ loop(UpstreamPid, NextPid, WorkerFun, FittingState, WantCount) ->
             DataMessages = [sk_data:make_data(self(), Emit, Identifiers) ||
                                Emit <- EmitList],
             sk_tracer:t(50, self(), NextPid, {?MODULE, data}, [{input, DataMessage}, {output, DataMessages}]),
-            WantCount2 = emit_downstream(NextPid, DataMessages, WantCount),
+            WantCount2 = emit_downstream(NextPid, EmitList, Identifiers,
+                                         WantCount),
             %% ?VV("bottom: WantCount2 ~w\n", [WantCount2]),
             loop(UpstreamPid, NextPid, WorkerFun, FittingState2, WantCount2);
         {system, eos} ->
@@ -90,11 +91,12 @@ loop(UpstreamPid, NextPid, WorkerFun, FittingState, WantCount) ->
             eos
     end.
 
-emit_downstream(NextPid, DataMessages, WantCount) ->
+emit_downstream(NextPid, EmitList, Identifiers, WantCount) ->
     lists:foldl(
-      fun(DataMessage, WCount) ->
+      fun(Value, WCount) ->
               WCount2 = sk_utils:bp_get_want_signal(WCount),
+              DataMessage = sk_data:make_data(self(), Value, Identifiers),
               NextPid ! DataMessage,
               %% ?VV("emit_downstream ~w ! ~w\n", [NextPid, DataMessage]),
               WCount2
-      end, WantCount, DataMessages).
+      end, WantCount, EmitList).

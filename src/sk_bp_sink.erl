@@ -49,6 +49,7 @@ make(InFlight, WorkerFun, InitData) ->
 -spec start(pid(), non_neg_integer(), function(), term()) -> 'eos'.
 %% @doc Sets the sink process to receive messages from other processes.
 start(NextPid, InFlight, WorkerFun, InitData) ->
+    %% ?VV("start NextPid = ~p\n", [NextPid]),
     {ok, FittingState} = WorkerFun({bp_init, InitData}, ignored_placeholder),
     %% ?VV("sink: inf ~w fs ~w\n", [InFlight, FittingState]),
     receive
