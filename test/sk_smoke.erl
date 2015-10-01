@@ -105,7 +105,7 @@ smoke_bp_crash1_test() ->
                         {bp_seq, 2, fun bp_demo_identity/2, init_data_ignored},
                         {bp_sink,2, fun bp_demo_sink/2, {Me,MyRef}}], Inputs),
         Pids = [FeederPid|WorkPids],
-        [ok = poll_until_pid_dead(P) || P <- Pids],
+        [ok = sk_utils:wait_until_dead(P) || P <- Pids],
         Statuses = [begin
                         Status = receive {'EXIT', P, Why} -> Why end,
                         %% ?VV("Worker ~p exited ~p\n", [P, Status]),
@@ -123,6 +123,35 @@ smoke_bp_crash1_test() ->
     after
         process_flag(trap_exit, false)
     end.
+
+-spec smoke_bp_farm1_test() -> term().
+smoke_bp_farm1_test() ->
+    Inputs = lists:seq(1,20),
+    NWorkers = 5,
+    Me = self(),
+    MyRef = make_ref(),
+
+    Farm = {bp_farm, 2,
+            [{bp_seq, 1, fun bp_double/2, 22},
+             {bp_seq, 1, fun bp_half/2, 77.4},
+             {bp_seq, 1, fun bp_truncate/2, -2.22}], NWorkers},
+    ResFun = fun() -> receive {sink_final_result, MyRef, Val} -> Val end end,
+
+    %% timer:sleep(50),?VV("\n", []),?VV("smoke_bp_farm1_test: top\n", []),
+    {_FeederPid1, _WorkPids1} =
+         skel:bp_do([{bp_seq,  2, fun bp_demo_identity/2, init_data_ignored},
+                     Farm,
+                     {bp_sink, 2, fun bp_demo_sink/2, {Me,MyRef}}], Inputs),
+    Res1 = ResFun(),
+    Inputs = Res1,
+
+    %% Same thing but with farm at beginning of the workflow.
+    {_FeederPid2, _WorkPids2} =
+         skel:bp_do([Farm,
+                     {bp_seq,  2, fun bp_demo_identity/2, init_data_ignored},
+                     {bp_sink, 2, fun bp_demo_sink/2, {Me,MyRef}}], Inputs),
+    Res2 = ResFun(),
+    Inputs = Res2.
 
 poll_until_pid_dead(Pid) ->
     case erlang:is_process_alive(Pid) of
@@ -220,8 +249,8 @@ bp_verbose_sleep(X, #demo{acc=SleepTime}=S) ->
 bp_crash_after({bp_init, {Limit,Reason}}, _Ignore) ->
     %% ?VV("crash bp_init: my links ~p\n", [process_info(self(), links)]),
     {ok, #crash{limit=Limit, reason=Reason, count=0}};
-bp_crash_after(bp_eoi, #crash{count=Count}=S) ->
-    %% ?VV("bp_crash_after: EIO count = ~w\n", [Count]),
+bp_crash_after(bp_eoi, #crash{count=_Count}=S) ->
+    %% ?VV("bp_crash_after: EIO count = ~w\n", [_Count]),
     {ok, S};
 bp_crash_after(X, #crash{limit=Limit, count=Count, reason=Reason}=S) ->
     %% ?VV("crash_after X ~w Count ~w reason ~w\n", [X, Count, Reason]),

@@ -18,6 +18,7 @@
         ,stop_workers/2
         ,bp_signal_upstream/2
         ,bp_get_want_signal/1
+        ,wait_until_dead/1
         ]).
 
 -include("skel.hrl").
@@ -75,6 +76,8 @@ stop_workers(Mod, [Worker|Rest]) ->
 
 
 -spec bp_signal_upstream(pid(), non_neg_integer()) -> 'ok'.
+bp_signal_upstream(UpstreamPid, 0) ->
+    ok;
 bp_signal_upstream(UpstreamPid, InFlight) ->
     %% io:format(user, "~s ~w ~w: send_want(~w <- ~w)\n", [?MODULE,?LINE,self(),UpstreamPid, InFlight]),
     UpstreamPid ! {system, bp_want, self(), InFlight},
@@ -102,4 +105,17 @@ bp_get_want_messages(WantCount) ->
             bp_get_want_messages(WantCount + InFlight)
     after 0 ->
             WantCount
+    end.
+
+-spec wait_until_dead(pid()) -> ok.
+wait_until_dead(Pid) ->
+    wait_until_dead(Pid, 1).
+
+wait_until_dead(Pid, N) ->
+    case erlang:is_process_alive(Pid) of
+        false ->
+            ok;
+        true ->
+            timer:sleep(erlang:min(N, 50)),
+            wait_until_dead(Pid, N + 1)
     end.

@@ -62,8 +62,8 @@ start(NextPid, InFlight, WorkerFun, InitData) ->
         {system, bp_upstream_fitting, UpstreamPid, SourcePid, ChainPids} ->
             %% ?VV("start: my upstream is ~w\n", [UpstreamPid]),
             link(SourcePid),
-            NextPid ! {system, bp_upstream_fitting, self(),
-                       SourcePid, [self()|ChainPids]},
+            NextPid ! {system, bp_upstream_fitting, self(), SourcePid,
+                       [self()|ChainPids]},
             sk_utils:bp_signal_upstream(UpstreamPid, InFlight),
             loop(UpstreamPid, NextPid, WorkerFun, FittingState, 0)
     end.
@@ -74,12 +74,13 @@ start(NextPid, InFlight, WorkerFun, InitData) ->
 loop(UpstreamPid, NextPid, WorkerFun, FittingState, WantCount) ->
     %% ?VV("top: WantCount ~w\n", [WantCount]),
     receive
-        {data,_,_} = DataMessage ->
+        {data, _, _, _} = DataMessage ->
             sk_utils:bp_signal_upstream(UpstreamPid, 1),
             Value = sk_data:value(DataMessage),
             {EmitList, FittingState2} = WorkerFun(Value, FittingState),
             Identifiers = sk_data:identifiers(DataMessage),
-            DataMessages = [{data, Emit, Identifiers} || Emit <- EmitList],
+            DataMessages = [sk_data:make_data(self(), Emit, Identifiers) ||
+                               Emit <- EmitList],
             sk_tracer:t(50, self(), NextPid, {?MODULE, data}, [{input, DataMessage}, {output, DataMessages}]),
             WantCount2 = emit_downstream(NextPid, DataMessages, WantCount),
             %% ?VV("top: WantCount2 ~w\n", [WantCount2]),

@@ -1,6 +1,7 @@
 %%%----------------------------------------------------------------------------
 %%% @author Sam Elliott <ashe@st-andrews.ac.uk>
 %%% @copyright 2012 University of St Andrews (See LICENCE)
+%%% @copyright 2015 Basho Technologies, Inc. (See LICENCE)
 %%% @headerfile "skel.hrl"
 %%%
 %%% @doc This module contains the initialization logic of a Farm skeleton.
@@ -18,30 +19,21 @@
 %%% 
 %%% @end
 %%%----------------------------------------------------------------------------
--module(sk_farm).
+-module(sk_bp_farm).
 
 -export([
-         make/2,  
-         make_hyb/4
+         make/3
         ]).
 
 -include("skel.hrl").
 
--spec make(pos_integer(), workflow()) -> maker_fun().
+-spec make(non_neg_integer(), pos_integer(), workflow()) -> maker_fun().
 %% @doc Initialises a Farm skeleton given the number of workers and their 
 %% inner-workflows, respectively.
-make(NWorkers, WorkFlow) ->
+make(InFlight, NWorkers, WorkFlow) ->
   fun(NextPid) ->
-    CollectorPid = spawn_link(sk_farm_collector, start, [NWorkers, NextPid]),
+    CollectorPid = spawn_link(sk_bp_farm_collector, start, [NWorkers, NextPid]),
     WorkerPids = sk_utils:start_workers(NWorkers, WorkFlow, CollectorPid),
-    spawn_link(sk_farm_emitter, start, [WorkerPids])
+    spawn_link(sk_bp_farm_emitter, start, [InFlight, WorkerPids, CollectorPid])
   end.
 
--spec make_hyb(pos_integer(), pos_integer(), workflow(), workflow()) -> maker_fun().
-make_hyb(NCPUWorkers, NGPUWorkers, WorkFlowCPU, WorkFlowGPU) ->
-  fun(NextPid) ->
-    CollectorPid = spawn_link(sk_farm_collector, start, [NCPUWorkers+NGPUWorkers, NextPid]),
-    WorkerPids = sk_utils:start_workers_hyb(NCPUWorkers, NGPUWorkers, WorkFlowCPU, WorkFlowGPU, 
-                                            CollectorPid),
-    spawn_link(sk_farm_emitter, start, [WorkerPids])
-  end.

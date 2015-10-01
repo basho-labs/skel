@@ -62,26 +62,26 @@ start(NextPid, InFlight, WorkerFun, InitData) ->
             SourcePid ! {system, bp_chain_pids, AllChainPids},
             %% ?VV("start: my upstream is ~w\n", [UpstreamPid]),
             sk_utils:bp_signal_upstream(UpstreamPid, InFlight),
-            loop_acc(UpstreamPid, NextPid, WorkerFun, FittingState)
+            loop(UpstreamPid, NextPid, WorkerFun, FittingState)
     end.
 
--spec loop_acc(pid(), pid(), function(), term()) -> 'eos'.
+-spec loop(pid(), pid(), function(), term()) -> 'eos'.
 %% @doc Recursively recieves messages, collecting each result in a list. 
 %% Returns the list of results when the system message <tt>eos</tt> is 
 %% received. 
-loop_acc(UpstreamPid, NextPid, WorkerFun, FittingState) ->
-    %% ?VV("loop_acc top\n", []),
+loop(UpstreamPid, NextPid, WorkerFun, FittingState) ->
+    %% ?VV("loop top\n", []),
     receive
-        {data, _, _} = DataMessage ->
+        {data, _, _, _} = DataMessage ->
             sk_utils:bp_signal_upstream(UpstreamPid, 1),
             Value = sk_data:value(DataMessage),
             sk_tracer:t(50, self(), {?MODULE, data}, [{input, DataMessage}, {value, Value}]),
 
             {ok, FittingState2} = WorkerFun(Value, FittingState),
-            loop_acc(UpstreamPid, NextPid, WorkerFun, FittingState2);
+            loop(UpstreamPid, NextPid, WorkerFun, FittingState2);
         {system, eos} ->
             sk_tracer:t(75, self(), {?MODULE, system}, [{msg, eos}]),
-            %% ?VV("loop_acc received eos\n", []),
+            %% ?VV("loop received eos\n", []),
             {ok, _FittingState2} = WorkerFun(bp_eoi, FittingState),
             eos
     end.

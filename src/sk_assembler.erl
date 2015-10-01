@@ -14,7 +14,6 @@
 
 -export([
          make/2
-	,make_hyb/4
         ,run/4
         ]).
 
@@ -34,12 +33,6 @@ make(WorkFlow, EndPid) when is_pid(EndPid) ->
   MakeFns = [parse(Section) || Section <- WorkFlow],
   lists:foldr(fun(MakeFn, Pid) -> MakeFn(Pid) end, EndPid, MakeFns).
 
--spec make_hyb(workflow(), pid(), pos_integer(), pos_integer()) -> pid().
-make_hyb(WorkFlow, EndPid, NCPUWorkers, NGPUWorkers) when is_pid(EndPid) ->
-  MakeFns = [parse_hyb(Section, NCPUWorkers, NGPUWorkers) || Section <- WorkFlow],
-  lists:foldr(fun(MakeFn, Pid) -> MakeFn(Pid) end, EndPid, MakeFns).
-    
-
 -spec run(pid() | workflow(), input(), boolean(), pid()) -> pid().
 %% @doc Function to produce and start a set of processes according to the 
 %% given workflow specification and input.
@@ -51,64 +44,12 @@ run(WorkFlow, Input, FlowControl_p, WhoToNotify) when is_list(WorkFlow) ->
   AssembledWF = make(WorkFlow, DrainPid),
   run(AssembledWF, Input, FlowControl_p, WhoToNotify).
 
-parse_hyb(Section, NCPUWorkers, NGPUWorkers) ->
-    case Section of
-	{hyb_map, WorkFlowCPU, WorkFlowGPU} ->
-	    parse({hyb_map, WorkFlowCPU, WorkFlowGPU, NCPUWorkers, NGPUWorkers});
-	Other -> parse(Other)
-    end.
-
-
 -spec parse(wf_item()) -> maker_fun().
 %% @doc Determines the course of action to be taken according to the type of 
 %% workflow specified. Constructs and starts specific skeleton instances.
 parse({bp_seq, InFlight, Fun, InitData}) when is_function(Fun, 2) ->
-  sk_bp_seq:make(InFlight, Fun, InitData);
+    sk_bp_seq:make(InFlight, Fun, InitData);
 parse({bp_sink, InFlight, Fun, InitData}) when is_function(Fun, 2) ->
-  sk_bp_sink:make(InFlight, Fun, InitData);
-parse(X) when X /= gonna_warn_you ->
-  exit("Do you know how broken the rest of this code is?");
-parse(Fun) when is_function(Fun, 1) ->
-  parse({seq, Fun});
-parse({seq, Fun}) when is_function(Fun, 1) ->
-  sk_seq:make(Fun);
-parse({pipe, WorkFlow}) ->
-  sk_pipe:make(WorkFlow);
-parse({ord, WorkFlow}) ->
-  sk_ord:make(WorkFlow);
-parse({farm, WorkFlow, NWorkers}) ->
-  sk_farm:make(NWorkers, WorkFlow);
-parse({hyb_farm, WorkFlowCPU, WorkFlowGPU, NCPUWorkers, NGPUWorkers}) ->
-  sk_farm:make_hyb(NCPUWorkers, NGPUWorkers, WorkFlowCPU, WorkFlowGPU);
-parse({map, WorkFlow}) ->
-  sk_map:make(WorkFlow);
-parse({map, WorkFlow, NWorkers}) ->
-  sk_map:make(WorkFlow, NWorkers);
-parse({hyb_map, WorkFlowCPU, WorkFlowGPU}) ->
-    sk_map:make_hyb(WorkFlowCPU, WorkFlowGPU);
-parse({hyb_map, WorkFlowCPU, WorkFlowGPU, NCPUWorkers, NGPUWorkers}) ->
-  sk_map:make_hyb(WorkFlowCPU, WorkFlowGPU, NCPUWorkers, NGPUWorkers);
-parse({cluster, WorkFlow, Decomp, Recomp}) when is_function(Decomp, 1),
-                                               is_function(Recomp, 1) ->
-  sk_cluster:make(WorkFlow, Decomp, Recomp);
-parse({hyb_cluster, WorkFlow, Decomp, Recomp, NCPUWorkers, NGPUWorkers}) when
-      is_function(Decomp, 1), is_function(Recomp, 1) ->
-    sk_cluster:make_hyb(WorkFlow, Decomp, Recomp, NCPUWorkers, NGPUWorkers);
-parse({hyb_cluster, WorkFlow, TimeRatio, NCPUWorkers, NGPUWorkers}) ->
-    sk_cluster:make_hyb(WorkFlow, TimeRatio, NCPUWorkers, NGPUWorkers);
-parse({hyb_cluster, WorkFlow, TimeRatio, StructSizeFun, MakeChunkFun, RecompFun, NCPUWorkers, NGPUWorkers}) ->
-    sk_cluster:make_hyb(WorkFlow, TimeRatio, StructSizeFun, MakeChunkFun, RecompFun, NCPUWorkers, NGPUWorkers);
-
-% parse({decomp, WorkFlow, Decomp, Recomp}) when is_function(Decomp, 1),
-%                                                is_function(Recomp, 1) ->
-%   sk_decomp:make(WorkFlow, Decomp, Recomp);
-% parse({map, WorkFlow, Decomp, Recomp}) when is_function(Decomp, 1),
-%                                             is_function(Recomp, 1) ->
-%   sk_map:make(WorkFlow, Decomp, Recomp);
-parse({reduce, Reduce, Decomp}) when is_function(Reduce, 2),
-                                     is_function(Decomp, 1) ->
-  sk_reduce:make(Decomp, Reduce);
-parse({feedback, WorkFlow, Filter}) when is_function(Filter, 1) ->
-  sk_feedback:make(WorkFlow, Filter).
-
-
+    sk_bp_sink:make(InFlight, Fun, InitData);
+parse({bp_farm, InFlight, WorkFlow, NWorkers}) ->
+    sk_bp_farm:make(InFlight, WorkFlow, NWorkers).

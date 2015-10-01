@@ -59,14 +59,7 @@ start(Input, NextPid, FlowControl_p, WhoToNotify) when is_list(Input) ->
             WhoToNotify ! {chain_pids, self(), ChainPids}
     end,
     %% ?VV("start: tell ~w I am its upstream\n", [NextPid]),
-    list_loop(Input, NextPid, FlowControl_p, 0);
-start(InputMod, NextPid, _FlowControl_p, _WhoToNotify) when is_atom(InputMod) ->
-  case InputMod:init() of
-    {ok, State} -> callback_loop(InputMod, State, NextPid);
-    {no_inputs, State}  ->
-      send_eos(NextPid),
-      InputMod:terminate(State)
-  end.
+    list_loop(Input, NextPid, FlowControl_p, 0).
 
 %% @doc Recursively sends each input in a given list to the process 
 %% <tt>NextPid</tt>.
@@ -80,20 +73,6 @@ list_loop([Input|Inputs], NextPid, FlowControl_p, WantCount) ->
                  end,
     send_input(Input, NextPid),
     list_loop(Inputs, NextPid, FlowControl_p, WantCount2).
-
-%% @todo doc
-callback_loop(InputMod, State, NextPid) ->
-  case InputMod:next_input(State) of
-    {input, NextInput, NewState} ->
-      send_input(NextInput, NextPid),
-      callback_loop(InputMod, NewState, NextPid);
-    {ignore, NewState} ->
-      callback_loop(InputMod, NewState, NextPid);
-    {eos, NewState} ->
-      send_eos(NextPid),
-      InputMod:terminate(NewState),
-      eos
-  end.
 
 %% @doc <tt>Input</tt> is formatted as a data message and sent to the 
 %% process <tt>NextPid</tt>. 

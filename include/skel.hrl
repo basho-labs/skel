@@ -44,7 +44,7 @@
 -type system_message()    :: {system, sm_item()}.
 %% These are all the system-level messages. EOS, coordination etc.
 
--type data_message()      :: {data, any(), [dm_identifier()]}.
+-type data_message()      :: {data, pid(), any(), [dm_identifier()]}.
 %% The data being passed, and a stack of information as to its identity and 
 %% ordering (used in ordered skeletons and maps).
 
