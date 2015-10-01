@@ -62,10 +62,10 @@ parse_hyb(Section, NCPUWorkers, NGPUWorkers) ->
 -spec parse(wf_item()) -> maker_fun().
 %% @doc Determines the course of action to be taken according to the type of 
 %% workflow specified. Constructs and starts specific skeleton instances.
-parse({bp_seq, Fun, InitData}) when is_function(Fun, 2) ->
-  sk_bp_seq:make(Fun, InitData);
-parse({bp_sink, Fun, InitData}) when is_function(Fun, 2) ->
-  sk_bp_sink:make(Fun, InitData);
+parse({bp_seq, InFlight, Fun, InitData}) when is_function(Fun, 2) ->
+  sk_bp_seq:make(InFlight, Fun, InitData);
+parse({bp_sink, InFlight, Fun, InitData}) when is_function(Fun, 2) ->
+  sk_bp_sink:make(InFlight, Fun, InitData);
 parse(X) when X /= gonna_warn_you ->
   exit("Do you know how broken the rest of this code is?");
 parse(Fun) when is_function(Fun, 1) ->

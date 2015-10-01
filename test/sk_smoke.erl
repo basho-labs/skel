@@ -37,7 +37,7 @@ smoke_bp_sink_test() ->
 
     %% timer:sleep(50),?VV("\n", []),?VV("smoke_bp_sink_test: top\n", []),
     {_FeederPid, _WorkPids} =
-        skel:bp_do([{bp_sink, fun bp_demo_sink/2, {Me, MyRef}}], Inputs),
+        skel:bp_do([{bp_sink, 2, fun bp_demo_sink/2, {Me, MyRef}}], Inputs),
     Res1 = receive
                {sink_final_result, MyRef, Val} ->
                    Val
@@ -52,11 +52,11 @@ smoke_bp_seq_test() ->
 
     %% timer:sleep(50),?VV("\n", []),?VV("smoke_bp_seq_test: top\n", []),
     {_FeederPid, _WorkPids} =
-         skel:bp_do([{bp_seq, fun bp_demo_identity/2, init_data_ignored},
-                     {bp_seq, fun bp_double/2, 22},
-                     {bp_seq, fun bp_half/2, 77.4},
-                     {bp_seq, fun bp_truncate/2, -2.22},
-                     {bp_sink, fun bp_demo_sink/2, {Me,MyRef}}], Inputs),
+         skel:bp_do([{bp_seq,  2, fun bp_demo_identity/2, init_data_ignored},
+                     {bp_seq,  2, fun bp_double/2, 22},
+                     {bp_seq,  2, fun bp_half/2, 77.4},
+                     {bp_seq,  2, fun bp_truncate/2, -2.22},
+                     {bp_sink, 2, fun bp_demo_sink/2, {Me,MyRef}}], Inputs),
     Res2 = receive
                {sink_final_result, MyRef, Val} ->
                    Val
@@ -74,11 +74,11 @@ smoke_bp_seq_sleep_test_SKIP() ->
     MyRef = make_ref(),
 
     {_FeederPid, _WorkPids} =
-         skel:bp_do([{bp_seq, fun bp_verbose_sleep/2, 50},
-                     {bp_seq, fun bp_verbose_sleep/2, 70},
-                     {bp_seq, fun bp_verbose_sleep/2, 90},
-                     {bp_seq, fun bp_verbose_sleep/2, 0},
-                     {bp_sink, fun bp_demo_sink/2, {Me,MyRef}}], Inputs),
+         skel:bp_do([{bp_seq,  2, fun bp_verbose_sleep/2, 50},
+                     {bp_seq,  2, fun bp_verbose_sleep/2, 70},
+                     {bp_seq,  2, fun bp_verbose_sleep/2, 90},
+                     {bp_seq,  2, fun bp_verbose_sleep/2, 0},
+                     {bp_sink, 2, fun bp_demo_sink/2, {Me,MyRef}}], Inputs),
     Res2 = receive
                {sink_final_result, MyRef, Val} ->
                    Val
@@ -99,11 +99,11 @@ smoke_bp_crash1_test() ->
 
     try
         {FeederPid, WorkPids} =
-            skel:bp_do([{bp_seq, fun bp_demo_identity/2, init_data_ignored},
-                        {bp_seq, fun bp_demo_identity/2, init_data_ignored},
-                        {bp_seq, fun bp_crash_after/2, {CrashAfter,ExitReason}},
-                        {bp_seq, fun bp_demo_identity/2, init_data_ignored},
-                        {bp_sink,fun bp_demo_sink/2, {Me,MyRef}}], Inputs),
+            skel:bp_do([{bp_seq, 2, fun bp_demo_identity/2, init_data_ignored},
+                        {bp_seq, 2, fun bp_demo_identity/2, init_data_ignored},
+                        {bp_seq, 2, fun bp_crash_after/2, {CrashAfter,ExitReason}},
+                        {bp_seq, 2, fun bp_demo_identity/2, init_data_ignored},
+                        {bp_sink,2, fun bp_demo_sink/2, {Me,MyRef}}], Inputs),
         Pids = [FeederPid|WorkPids],
         [ok = poll_until_pid_dead(P) || P <- Pids],
         Statuses = [begin
@@ -148,16 +148,12 @@ truncate(X) ->
 %% the pid of our downstream.
 
 -record(demo, {
-          acc :: number(),
-          downstream :: pid()
+          acc :: number()
          }).
 
 bp_demo_identity({bp_init, _Data}, _Ignore) ->
     %% ?VV("identity bp_init\n", []),
-    InFlight = 2,
-    {InFlight, #demo{acc=0, downstream=undefined}};
-bp_demo_identity({bp_downstream, DownStream}, S) ->
-    {ok, S#demo{downstream=DownStream}};
+    {ok, #demo{acc=0}};
 bp_demo_identity(bp_eoi, #demo{acc=_Acc}=S) ->
     %% ?VV("identity bp_eoi: Acc ~w\n", [_Acc]),
     {ok, S};
@@ -169,11 +165,7 @@ bp_demo_identity(X, #demo{acc=Acc}=S) ->
 
 bp_demo_sink({bp_init, {_,_}=MyParent}, _Ignore) ->
     %% ?VV("sink bp_init: my links ~w\n", [process_info(self(), links)]),
-    InFlight = 2,
-    {InFlight, {[], MyParent}};
-bp_demo_sink({bp_init, Bad}, _Ignore) ->
-    ?VV("sink bp_init BAD: ~w\n", [Bad]),
-    exit({expected_2_tuple_for_init,got,Bad});
+    {ok, {[], MyParent}};
 bp_demo_sink(bp_eoi, {Acc, {MyParentPid,Ref}}=State) ->
     %% ?VV("sink bp_eoi: Acc ~w\n", [Acc]),
     MyParentPid ! {sink_final_result, Ref, lists:reverse(Acc)},
@@ -183,10 +175,7 @@ bp_demo_sink(Data, {Acc, MyParent}) ->
     {ok, {[Data|Acc], MyParent}}.
 
 bp_double({bp_init, InitData}, _Ignore) ->
-    InFlight = 2,
-    {InFlight, #demo{acc=InitData, downstream=undefined}};
-bp_double({bp_downstream, DownStream}, S) ->
-    {ok, S#demo{downstream=DownStream}};
+    {ok, #demo{acc=InitData}};
 bp_double(bp_eoi, S) ->
     {ok, S};
 bp_double(X, #demo{acc=Acc}=S) ->
@@ -194,10 +183,7 @@ bp_double(X, #demo{acc=Acc}=S) ->
     {[Res], S#demo{acc=Acc+Res}}.
 
 bp_half({bp_init, InitData}, _Ignore) ->
-    InFlight = 2,
-    {InFlight, #demo{acc=InitData, downstream=undefined}};
-bp_half({bp_downstream, DownStream}, S) ->
-    {ok, S#demo{downstream=DownStream}};
+    {ok, #demo{acc=InitData}};
 bp_half(bp_eoi, S) ->
     {ok, S};
 bp_half(X, #demo{acc=Acc}=S) ->
@@ -205,10 +191,7 @@ bp_half(X, #demo{acc=Acc}=S) ->
     {[Res], S#demo{acc=Acc+Res}}.
 
 bp_truncate({bp_init, InitData}, _Ignore) ->
-    InFlight = 2,
-    {InFlight, #demo{acc=InitData, downstream=undefined}};
-bp_truncate({bp_downstream, DownStream}, S) ->
-    {ok, S#demo{downstream=DownStream}};
+    {ok, #demo{acc=InitData}};
 bp_truncate(bp_eoi, S) ->
     {ok, S};
 bp_truncate(X, #demo{acc=Acc}=S) ->
@@ -216,10 +199,7 @@ bp_truncate(X, #demo{acc=Acc}=S) ->
     {[Res], S#demo{acc=Acc+Res}}.
 
 bp_verbose_sleep({bp_init, InitData}, _Ignore) ->
-    InFlight = 2,
-    {InFlight, #demo{acc=InitData, downstream=undefined}};
-bp_verbose_sleep({bp_downstream, DownStream}, S) ->
-    {ok, S#demo{downstream=DownStream}};
+    {ok, #demo{acc=InitData}};
 bp_verbose_sleep(bp_eoi, S) ->
     {ok, S};
 bp_verbose_sleep(X, #demo{acc=SleepTime}=S) ->
@@ -234,17 +214,12 @@ bp_verbose_sleep(X, #demo{acc=SleepTime}=S) ->
 -record(crash, {
           limit  :: non_neg_integer(),
           count  :: non_neg_integer(),
-          reason :: term(),
-          downstream :: pid()
+          reason :: term()
          }).
 
 bp_crash_after({bp_init, {Limit,Reason}}, _Ignore) ->
     %% ?VV("crash bp_init: my links ~p\n", [process_info(self(), links)]),
-    InFlight = 2,
-    {InFlight, #crash{limit=Limit, reason=Reason,
-                      count=0, downstream=undefined}};
-bp_crash_after({bp_downstream, DownStream}, S) ->
-    {ok, S#crash{downstream=DownStream}};
+    {ok, #crash{limit=Limit, reason=Reason, count=0}};
 bp_crash_after(bp_eoi, #crash{count=Count}=S) ->
     %% ?VV("bp_crash_after: EIO count = ~w\n", [Count]),
     {ok, S};

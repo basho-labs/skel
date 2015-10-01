@@ -29,8 +29,8 @@
 -module(sk_bp_seq).
 
 -export([
-         start/3
-        ,make/2
+         start/4
+        ,make/3
         ]).
 
 -include("skel.hrl").
@@ -42,22 +42,21 @@
 -define(V(Fmt, Args), io:format(user, Fmt, Args)).
 -define(VV(Fmt, Args), io:format(user, "~s ~w ~w: " ++ Fmt, [?MODULE,?LINE,self()]++Args)).
 
--spec make(worker_fun(), init_data())  -> skel:maker_fun().
+-spec make(non_neg_integer(), worker_fun(), init_data())  -> skel:maker_fun().
 %% @doc Spawns a worker process performing the function `WorkerFun'. 
 %% Returns an anonymous function that takes the parent process `NextPid'
 %% as an argument. 
-make(WorkerFun, InitData) ->
+make(InFlight, WorkerFun, InitData) ->
     fun(NextPid) ->
-            spawn_link(?MODULE, start, [NextPid, WorkerFun, InitData])
+            spawn_link(?MODULE, start, [NextPid, InFlight, WorkerFun, InitData])
     end.
 
--spec start(pid(), worker_fun(), init_data()) -> eos.
+-spec start(pid(), non_neg_integer(), worker_fun(), init_data()) -> eos.
 %% @doc Starts the worker process' task. Recursively receives the worker 
 %% function's input, and applies it to said function.
-start(NextPid, WorkerFun, InitData) ->
+start(NextPid, InFlight, WorkerFun, InitData) ->
     sk_tracer:t(75, self(), {?MODULE, start}, [{next_pid, NextPid}]),
-    {InFlight, FittingState} = WorkerFun({bp_init, InitData},
-                                         ignored_placeholder),
+    {ok, FittingState} = WorkerFun({bp_init, InitData}, ignored_placeholder),
     %% ?VV("bp_seq start: inf ~w fs ~w\n", [InFlight, FittingState]),
     receive
         {system, bp_upstream_fitting, UpstreamPid, SourcePid, ChainPids} ->

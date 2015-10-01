@@ -18,8 +18,8 @@
 -module(sk_bp_sink).
 
 -export([
-         make/2
-        ,start_acc/3
+         make/3
+        ,start/4
         ]).
 
 -include("skel.hrl").
@@ -42,18 +42,17 @@
 %% -callback terminate(State :: term()) ->
 %%     term().
 
--spec make(function(), term()) -> maker_fun().
+-spec make(non_neg_integer(), function(), term()) -> maker_fun().
 %% @doc Creates the process to which the final results are sent.
-make(WorkerFun, InitData) ->
+make(InFlight, WorkerFun, InitData) ->
   fun(Pid) ->
-    spawn_link(?MODULE, start_acc, [Pid, WorkerFun, InitData])
+    spawn_link(?MODULE, start, [Pid, InFlight, WorkerFun, InitData])
   end.
 
--spec start_acc(pid(), function(), term()) -> 'eos'.
+-spec start(pid(), non_neg_integer(), function(), term()) -> 'eos'.
 %% @doc Sets the sink process to receive messages from other processes.
-start_acc(NextPid, WorkerFun, InitData) ->
-    {InFlight, FittingState} = WorkerFun({bp_init, InitData},
-                                         ignored_placeholder),
+start(NextPid, InFlight, WorkerFun, InitData) ->
+    {ok, FittingState} = WorkerFun({bp_init, InitData}, ignored_placeholder),
     %% ?VV("sink: inf ~w fs ~w\n", [InFlight, FittingState]),
     receive
         {system, bp_upstream_fitting, UpstreamPid, SourcePid, ChainPids} ->
@@ -61,7 +60,7 @@ start_acc(NextPid, WorkerFun, InitData) ->
             [link(Pid) || Pid <- [SourcePid|ChainPids]],
             AllChainPids = lists:reverse([self()|ChainPids]),
             SourcePid ! {system, bp_chain_pids, AllChainPids},
-            %% ?VV("start_acc: my upstream is ~w\n", [UpstreamPid]),
+            %% ?VV("start: my upstream is ~w\n", [UpstreamPid]),
             sk_utils:bp_signal_upstream(UpstreamPid, InFlight),
             loop_acc(UpstreamPid, NextPid, WorkerFun, FittingState)
     end.
