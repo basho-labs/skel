@@ -82,3 +82,6 @@
 -type data_filter_fun() :: fun((data_message())       -> boolean()).
 %% Any function that determines whether a data message satisfies some given 
 %% constraint.
+
+-define(V(Fmt, Args), io:format(user, Fmt, Args)).
+-define(VV(Fmt, Args), io:format(user, "~s ~w ~w: " ++ Fmt, [?MODULE,?LINE,self()]++Args)).

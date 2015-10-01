@@ -30,7 +30,7 @@
 -spec make(non_neg_integer(), pos_integer(), workflow()) -> maker_fun().
 %% @doc Initialises a Farm skeleton given the number of workers and their 
 %% inner-workflows, respectively.
-make(InFlight, NWorkers, WorkFlow) ->
+make(InFlight, WorkFlow, NWorkers) ->
   fun(NextPid) ->
     CollectorPid = spawn_link(sk_bp_farm_collector, start, [NWorkers, NextPid]),
     WorkerPids = sk_utils:start_workers(NWorkers, WorkFlow, CollectorPid),

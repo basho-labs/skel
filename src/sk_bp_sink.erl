@@ -28,9 +28,6 @@
 -compile(export_all).
 -endif.
 
--define(V(Fmt, Args), io:format(user, Fmt, Args)).
--define(VV(Fmt, Args), io:format(user, "~s ~w ~w: " ++ Fmt, [?MODULE,?LINE,self()]++Args)).
-
 %% -callback init() ->
 %%     {ok, State :: term()} |
 %%     {stop, State :: term()}.
@@ -70,9 +67,9 @@ start(NextPid, InFlight, WorkerFun, InitData) ->
 %% Returns the list of results when the system message <tt>eos</tt> is 
 %% received. 
 loop(UpstreamPid, NextPid, WorkerFun, FittingState) ->
-    %% ?VV("loop top\n", []),
     receive
         {data, _, _, _} = DataMessage ->
+            %% ?VV("loop received ~w\n", [DataMessage]),
             sk_utils:bp_signal_upstream(UpstreamPid, 1),
             Value = sk_data:value(DataMessage),
             sk_tracer:t(50, self(), {?MODULE, data}, [{input, DataMessage}, {value, Value}]),

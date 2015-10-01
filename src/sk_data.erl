@@ -46,7 +46,7 @@ identifiers({data, _FromPid, _Value, Identifiers}) ->
 
 -spec make_data(pid(), any(), list()) -> data_message().
 make_data(FromPid, Data, Identifiers) ->
-    {FromPid, Data, Identifiers}.
+    {data, FromPid, Data, Identifiers}.
 
 -spec set_sender(data_message()) -> data_message().
 set_sender(DataMessage) ->

@@ -26,9 +26,6 @@
 -compile(export_all).
 -endif.
 
--define(V(Fmt, Args), io:format(user, Fmt, Args)).
--define(VV(Fmt, Args), io:format(user, "~s ~w ~w: " ++ Fmt, [?MODULE,?LINE,self()]++Args)).
-
 -callback init() ->
     {ok, State :: term()} |
     {no_inputs, State :: term()}.

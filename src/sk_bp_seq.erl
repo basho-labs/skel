@@ -39,9 +39,6 @@
 -compile(export_all).
 -endif.
 
--define(V(Fmt, Args), io:format(user, Fmt, Args)).
--define(VV(Fmt, Args), io:format(user, "~s ~w ~w: " ++ Fmt, [?MODULE,?LINE,self()]++Args)).
-
 -spec make(non_neg_integer(), worker_fun(), init_data())  -> skel:maker_fun().
 %% @doc Spawns a worker process performing the function `WorkerFun'. 
 %% Returns an anonymous function that takes the parent process `NextPid'
@@ -83,7 +80,7 @@ loop(UpstreamPid, NextPid, WorkerFun, FittingState, WantCount) ->
                                Emit <- EmitList],
             sk_tracer:t(50, self(), NextPid, {?MODULE, data}, [{input, DataMessage}, {output, DataMessages}]),
             WantCount2 = emit_downstream(NextPid, DataMessages, WantCount),
-            %% ?VV("top: WantCount2 ~w\n", [WantCount2]),
+            %% ?VV("bottom: WantCount2 ~w\n", [WantCount2]),
             loop(UpstreamPid, NextPid, WorkerFun, FittingState2, WantCount2);
         {system, eos} ->
             sk_tracer:t(75, self(), NextPid, {?MODULE, system}, [{message, eos}]),
@@ -97,5 +94,6 @@ emit_downstream(NextPid, DataMessages, WantCount) ->
       fun(DataMessage, WCount) ->
               WCount2 = sk_utils:bp_get_want_signal(WCount),
               NextPid ! DataMessage,
+              %% ?VV("emit_downstream ~w ! ~w\n", [NextPid, DataMessage]),
               WCount2
       end, WantCount, DataMessages).

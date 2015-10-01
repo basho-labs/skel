@@ -57,6 +57,7 @@ smoke_bp_seq_test() ->
                      {bp_seq,  2, fun bp_half/2, 77.4},
                      {bp_seq,  2, fun bp_truncate/2, -2.22},
                      {bp_sink, 2, fun bp_demo_sink/2, {Me,MyRef}}], Inputs),
+    %% ?VV("Feeder ~p WorkPids ~p\n", [_FeederPid, _WorkPids]),
     Res2 = receive
                {sink_final_result, MyRef, Val} ->
                    Val
@@ -160,18 +161,6 @@ poll_until_pid_dead(Pid) ->
         _ ->
             timer:sleep(10)
     end.
-
-identity(X) ->
-    X.
-
-double(X) ->
-    X * 2.
-
-half(X) ->
-    X / 2.
-
-truncate(X) ->
-    trunc(X).
 
 %% Simple state model: each stage keeps an additive accumulator and
 %% the pid of our downstream.
