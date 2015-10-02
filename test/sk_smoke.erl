@@ -203,6 +203,27 @@ smoke_bp_farm1_test() ->
 
     ok.
 
+-spec smoke_bp_continue1_test() -> term().
+smoke_bp_continue1_test() ->
+    StopAt = 5,
+    Inputs = lists:seq(1, StopAt),
+    Me = self(),
+    MyRef = make_ref(),
+
+    {_FeederPid, _WorkPids} =
+         skel:bp_do([{bp_seq,  2, fun bp_mult_emit_ints/3, 50},
+                     {bp_seq,  2, fun bp_double/3, 70},
+                     {bp_sink, 2, fun bp_demo_sink/3, {Me,MyRef}}], Inputs),
+    Res1 = receive
+               {sink_final_result, MyRef, Val} ->
+                   Val
+           end,
+    Double = fun(X) -> X * 2 end,
+    Expected = lists:flatten(
+                 [ [Double(I) || I <- lists:seq(1, Max)] ||
+                     Max <- lists:seq(1, StopAt) ]),
+    Expected = Res1.
+
 poll_until_pid_dead(Pid) ->
     case erlang:is_process_alive(Pid) of
         false ->
@@ -306,5 +327,24 @@ bp_prepend(bp_eoi, _, S) ->
 bp_prepend(bp_work, List, S) ->
     Res = [S|List],
     {done, [Res], S}.
+
+bp_mult_emit_ints(bp_init, _Data, _Ignore) ->
+    {ok, unused};
+bp_mult_emit_ints(bp_eoi, _, S) ->
+    {ok, S};
+bp_mult_emit_ints(bp_work, StopAt, S) when StopAt > 0 ->
+    Emit = 1,
+    if StopAt == 1 ->
+            {done, [Emit], S};
+       true ->
+            {continue, [Emit], {Emit+1, StopAt}, S}
+    end;
+bp_mult_emit_ints(bp_continue, {NextInt, StopAt}, S) ->
+    Emit = NextInt,
+    if NextInt == StopAt ->
+            {done, [Emit], S};
+       true ->
+            {continue, [Emit], {Emit+1, StopAt}, S}
+    end.
 
 -endif. % TEST

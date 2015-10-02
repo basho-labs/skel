@@ -75,14 +75,11 @@ loop(UpstreamPid, NextPid, WorkerFun, FittingState, WantCount) ->
         {data, _, _, _} = DataMessage ->
             sk_utils:bp_signal_upstream(UpstreamPid, 1),
             Value = sk_data:value(DataMessage),
-            {done, EmitList, FittingState2} = WorkerFun(bp_work,
-                                                        Value, FittingState),
             Identifiers = sk_data:identifiers(DataMessage),
-            DataMessages = [sk_data:make_data(self(), Emit, Identifiers) ||
-                               Emit <- EmitList],
-            sk_tracer:t(50, self(), NextPid, {?MODULE, data}, [{input, DataMessage}, {output, DataMessages}]),
-            WantCount2 = emit_downstream(NextPid, EmitList, Identifiers,
-                                         WantCount),
+            Fun1 = fun(FState) -> WorkerFun(bp_work, Value, FState) end,
+            {FittingState2, WantCount2} =
+                do_work(Fun1, FittingState, Identifiers, WorkerFun,
+                        NextPid, WantCount),
             %% ?VV("bottom: WantCount2 ~w\n", [WantCount2]),
             loop(UpstreamPid, NextPid, WorkerFun, FittingState2, WantCount2);
         {system, eos} ->
@@ -93,11 +90,27 @@ loop(UpstreamPid, NextPid, WorkerFun, FittingState, WantCount) ->
             eos
     end.
 
+do_work(Fun1, FittingState, Identifiers, WorkerFun, NextPid, WantCount) ->
+    case Fun1(FittingState) of
+        {done, EmitList, FittingState2} ->
+            WantCount2 = emit_downstream(NextPid, EmitList,
+                                         Identifiers, WantCount),
+            %% ?VV("bottom: WantCount2 ~w\n", [WantCount2]),
+            {FittingState2, WantCount2};
+        {continue, EmitList, Continue, FittingState2} ->
+            WantCount2 = emit_downstream(NextPid, EmitList,
+                                         Identifiers, WantCount),
+            Fun2 = fun(FState) -> WorkerFun(bp_continue, Continue, FState) end,
+            do_work(Fun2, FittingState2, Identifiers, WorkerFun,
+                    NextPid, WantCount2)
+    end.
+
 emit_downstream(NextPid, EmitList, Identifiers, WantCount) ->
     lists:foldl(
       fun(Value, WCount) ->
               WCount2 = sk_utils:bp_get_want_signal(WCount),
               DataMessage = sk_data:make_data(self(), Value, Identifiers),
+              sk_tracer:t(50, self(), NextPid, {?MODULE, data}, [{input, DataMessage}, {output, DataMessage}]),
               NextPid ! DataMessage,
               %% ?VV("emit_downstream ~w ! ~w\n", [NextPid, DataMessage]),
               WCount2
