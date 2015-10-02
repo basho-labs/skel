@@ -54,7 +54,7 @@ make(InFlight, WorkerFun, InitData) ->
 start(NextPid, InFlight, WorkerFun, InitData) ->
     %% ?VV("start NextPid = ~p\n", [NextPid]),
     sk_tracer:t(75, self(), {?MODULE, start}, [{next_pid, NextPid}]),
-    {ok, FittingState} = WorkerFun({bp_init, InitData}, ignored_placeholder),
+    {ok, FittingState} = WorkerFun(bp_init, InitData, ignored_placeholder),
     %% ?VV("bp_seq start: inf ~w fs ~w\n", [InFlight, FittingState]),
     receive
         {system, bp_upstream_fitting, UpstreamPid, SourcePid, ChainPids} ->
@@ -75,7 +75,8 @@ loop(UpstreamPid, NextPid, WorkerFun, FittingState, WantCount) ->
         {data, _, _, _} = DataMessage ->
             sk_utils:bp_signal_upstream(UpstreamPid, 1),
             Value = sk_data:value(DataMessage),
-            {EmitList, FittingState2} = WorkerFun(Value, FittingState),
+            {done, EmitList, FittingState2} = WorkerFun(bp_work,
+                                                        Value, FittingState),
             Identifiers = sk_data:identifiers(DataMessage),
             DataMessages = [sk_data:make_data(self(), Emit, Identifiers) ||
                                Emit <- EmitList],
@@ -87,6 +88,7 @@ loop(UpstreamPid, NextPid, WorkerFun, FittingState, WantCount) ->
         {system, eos} ->
             sk_tracer:t(75, self(), NextPid, {?MODULE, system}, [{message, eos}]),
             %% ?VV("got eos, send to ~w\n", [NextPid]),
+            {ok, _FittingState2} = WorkerFun(bp_eoi, ignored, FittingState),
             NextPid ! {system, eos},
             eos
     end.

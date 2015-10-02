@@ -47,9 +47,9 @@ run(WorkFlow, Input, FlowControl_p, WhoToNotify) when is_list(WorkFlow) ->
 -spec parse(wf_item()) -> maker_fun().
 %% @doc Determines the course of action to be taken according to the type of 
 %% workflow specified. Constructs and starts specific skeleton instances.
-parse({bp_seq, InFlight, Fun, InitData}) when is_function(Fun, 2) ->
+parse({bp_seq, InFlight, Fun, InitData}) when is_function(Fun, 3) ->
     sk_bp_seq:make(InFlight, Fun, InitData);
-parse({bp_sink, InFlight, Fun, InitData}) when is_function(Fun, 2) ->
+parse({bp_sink, InFlight, Fun, InitData}) when is_function(Fun, 3) ->
     sk_bp_sink:make(InFlight, Fun, InitData);
 parse({bp_farm, InFlight, WorkFlow, NWorkers}) ->
     sk_bp_farm:make(InFlight, WorkFlow, NWorkers).

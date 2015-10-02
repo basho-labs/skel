@@ -37,7 +37,7 @@ smoke_bp_sink_test() ->
 
     %% timer:sleep(50),?VV("\n", []),?VV("smoke_bp_sink_test: top\n", []),
     {_FeederPid, _WorkPids} =
-        skel:bp_do([{bp_sink, 2, fun bp_demo_sink/2, {Me, MyRef}}], Inputs),
+        skel:bp_do([{bp_sink, 2, fun bp_demo_sink/3, {Me, MyRef}}], Inputs),
     Res1 = receive
                {sink_final_result, MyRef, Val} ->
                    Val
@@ -52,11 +52,11 @@ smoke_bp_seq_test() ->
 
     %% timer:sleep(50),?VV("\n", []),?VV("smoke_bp_seq_test: top\n", []),
     {_FeederPid, _WorkPids} =
-         skel:bp_do([{bp_seq,  2, fun bp_demo_identity/2, init_data_ignored},
-                     {bp_seq,  2, fun bp_double/2, 22},
-                     {bp_seq,  2, fun bp_half/2, 77.4},
-                     {bp_seq,  2, fun bp_truncate/2, -2.22},
-                     {bp_sink, 2, fun bp_demo_sink/2, {Me,MyRef}}], Inputs),
+         skel:bp_do([{bp_seq,  2, fun bp_demo_identity/3, init_data_ignored},
+                     {bp_seq,  2, fun bp_double/3, 22},
+                     {bp_seq,  2, fun bp_half/3, 77.4},
+                     {bp_seq,  2, fun bp_truncate/3, -2.22},
+                     {bp_sink, 2, fun bp_demo_sink/3, {Me,MyRef}}], Inputs),
     %% ?VV("Feeder ~p WorkPids ~p\n", [_FeederPid, _WorkPids]),
     Res2 = receive
                {sink_final_result, MyRef, Val} ->
@@ -75,11 +75,11 @@ smoke_bp_seq_sleep_test_SKIP() ->
     MyRef = make_ref(),
 
     {_FeederPid, _WorkPids} =
-         skel:bp_do([{bp_seq,  2, fun bp_verbose_sleep/2, 50},
-                     {bp_seq,  2, fun bp_verbose_sleep/2, 70},
-                     {bp_seq,  2, fun bp_verbose_sleep/2, 90},
-                     {bp_seq,  2, fun bp_verbose_sleep/2, 0},
-                     {bp_sink, 2, fun bp_demo_sink/2, {Me,MyRef}}], Inputs),
+         skel:bp_do([{bp_seq,  2, fun bp_verbose_sleep/3, 50},
+                     {bp_seq,  2, fun bp_verbose_sleep/3, 70},
+                     {bp_seq,  2, fun bp_verbose_sleep/3, 90},
+                     {bp_seq,  2, fun bp_verbose_sleep/3, 0},
+                     {bp_sink, 2, fun bp_demo_sink/3, {Me,MyRef}}], Inputs),
     Res2 = receive
                {sink_final_result, MyRef, Val} ->
                    Val
@@ -100,11 +100,11 @@ smoke_bp_crash1_test() ->
 
     try
         {FeederPid, WorkPids} =
-            skel:bp_do([{bp_seq, 2, fun bp_demo_identity/2, init_data_ignored},
-                        {bp_seq, 2, fun bp_demo_identity/2, init_data_ignored},
-                        {bp_seq, 2, fun bp_crash_after/2, {CrashAfter,ExitReason}},
-                        {bp_seq, 2, fun bp_demo_identity/2, init_data_ignored},
-                        {bp_sink,2, fun bp_demo_sink/2, {Me,MyRef}}], Inputs),
+            skel:bp_do([{bp_seq, 2, fun bp_demo_identity/3, init_data_ignored},
+                        {bp_seq, 2, fun bp_demo_identity/3, init_data_ignored},
+                        {bp_seq, 2, fun bp_crash_after/3, {CrashAfter,ExitReason}},
+                        {bp_seq, 2, fun bp_demo_identity/3, init_data_ignored},
+                        {bp_sink,2, fun bp_demo_sink/3, {Me,MyRef}}], Inputs),
         Pids = [FeederPid|WorkPids],
         [ok = sk_utils:wait_until_dead(P) || P <- Pids],
         Statuses = [begin
@@ -133,15 +133,15 @@ smoke_bp_farm1_test() ->
     MyRef = make_ref(),
 
     Farm1 = {bp_farm, 2,
-             [{bp_seq, 1, fun bp_double/2, 22},
-              {bp_seq, 1, fun bp_half/2, 77.4},
-              {bp_seq, 1, fun bp_truncate/2, -2.22}], NWorkers},
+             [{bp_seq, 1, fun bp_double/3, 22},
+              {bp_seq, 1, fun bp_half/3, 77.4},
+              {bp_seq, 1, fun bp_truncate/3, -2.22}], NWorkers},
     GetRes = fun() -> receive {sink_final_result, MyRef, Val} -> Val end end,
 
     {_FeederPid1, _WorkPids1} =
-         skel:bp_do([{bp_seq,  2, fun bp_demo_identity/2, init_data_ignored},
+         skel:bp_do([{bp_seq,  2, fun bp_demo_identity/3, init_data_ignored},
                      Farm1,
-                     {bp_sink, 2, fun bp_demo_sink/2, {Me,MyRef}}], Inputs),
+                     {bp_sink, 2, fun bp_demo_sink/3, {Me,MyRef}}], Inputs),
     %% ?VV("Feeder ~p WorkPids ~p\n", [_FeederPid1, _WorkPids1]),
     Res1 = GetRes(),
     %% Results can arrive out of order, so we sort them for the match
@@ -150,53 +150,53 @@ smoke_bp_farm1_test() ->
     %% Same thing but with farm at beginning of the workflow.
     {_FeederPid2, _WorkPids2} =
          skel:bp_do([Farm1,
-                     {bp_seq,  2, fun bp_demo_identity/2, init_data_ignored},
+                     {bp_seq,  2, fun bp_demo_identity/3, init_data_ignored},
                      Farm1,
-                     {bp_sink, 2, fun bp_demo_sink/2, {Me,MyRef}}], Inputs),
+                     {bp_sink, 2, fun bp_demo_sink/3, {Me,MyRef}}], Inputs),
     Res2 = GetRes(),
     %% Results can arrive out of order, so we sort them for the match
     Inputs = lists:sort(Res2),
 
     Farm2 = {bp_farm, 2,
              [Farm1,
-              {bp_seq, 1, fun bp_double/2, 22},
-              {bp_seq, 1, fun bp_double/2, 22},
+              {bp_seq, 1, fun bp_double/3, 22},
+              {bp_seq, 1, fun bp_double/3, 22},
               Farm1,
-              {bp_seq, 1, fun bp_half/2, 77.4},
-              {bp_seq, 1, fun bp_half/2, 77.4},
+              {bp_seq, 1, fun bp_half/3, 77.4},
+              {bp_seq, 1, fun bp_half/3, 77.4},
               %% Farm1,
-              {bp_seq, 1, fun bp_truncate/2, -2.22}], NWorkers*2},
+              {bp_seq, 1, fun bp_truncate/3, -2.22}], NWorkers*2},
     {_FeederPid3, _WorkPids3} =
          skel:bp_do([Farm2,
-                     {bp_seq,  2, fun bp_demo_identity/2, init_data_ignored},
+                     {bp_seq,  2, fun bp_demo_identity/3, init_data_ignored},
                      Farm2,
-                     {bp_sink, 2, fun bp_demo_sink/2, {Me,MyRef}}], Inputs),
+                     {bp_sink, 2, fun bp_demo_sink/3, {Me,MyRef}}], Inputs),
     Res3 = GetRes(),
     %% Results can arrive out of order, so we sort them for the match
     Inputs = lists:sort(Res3),
 
     Inputsx = lists:duplicate(123, [q]),
     Farm0x = {bp_farm, 2,
-              [{bp_seq, 1, fun bp_prepend/2, -1},
-               {bp_seq, 1, fun bp_prepend/2, -2},
-               {bp_seq, 1, fun bp_prepend/2, -3}], NWorkers},
+              [{bp_seq, 1, fun bp_prepend/3, -1},
+               {bp_seq, 1, fun bp_prepend/3, -2},
+               {bp_seq, 1, fun bp_prepend/3, -3}], NWorkers},
     Farm1x = {bp_farm, 2,
-              [{bp_seq, 1, fun bp_prepend/2, 1},
+              [{bp_seq, 1, fun bp_prepend/3, 1},
                Farm0x,
-               {bp_seq, 1, fun bp_prepend/2, 2},
-               {bp_seq, 1, fun bp_prepend/2, 3}], NWorkers},
+               {bp_seq, 1, fun bp_prepend/3, 2},
+               {bp_seq, 1, fun bp_prepend/3, 3}], NWorkers},
     Farm2x = {bp_farm, 2,
               [Farm1x,
-               {bp_seq, 1, fun bp_prepend/2, 10},
-               {bp_seq, 1, fun bp_prepend/2, 11},
+               {bp_seq, 1, fun bp_prepend/3, 10},
+               {bp_seq, 1, fun bp_prepend/3, 11},
                Farm1x,
-               {bp_seq, 1, fun bp_prepend/2, 12},
-               {bp_seq, 1, fun bp_prepend/2, 13},
+               {bp_seq, 1, fun bp_prepend/3, 12},
+               {bp_seq, 1, fun bp_prepend/3, 13},
                Farm1x,
-               {bp_seq, 1, fun bp_prepend/2, 14}], NWorkers*2},
+               {bp_seq, 1, fun bp_prepend/3, 14}], NWorkers*2},
     {_FeederPid4, _WorkPids4} =
         skel:bp_do([Farm2x,
-                    {bp_sink, 2, fun bp_demo_sink/2, {Me,MyRef}}], Inputsx),
+                    {bp_sink, 2, fun bp_demo_sink/3, {Me,MyRef}}], Inputsx),
     Res3x = GetRes(),
     %% Results can arrive out of order, so we sort them for the match
     1 = length(lists:usort(Res3x)),
@@ -218,65 +218,65 @@ poll_until_pid_dead(Pid) ->
           acc :: number()
          }).
 
-bp_demo_identity({bp_init, _Data}, _Ignore) ->
+bp_demo_identity(bp_init, _Data, _Ignore) ->
     %% ?VV("identity bp_init\n", []),
     {ok, #demo{acc=0}};
-bp_demo_identity(bp_eoi, #demo{acc=_Acc}=S) ->
+bp_demo_identity(bp_eoi, _, #demo{acc=_Acc}=S) ->
     %% ?VV("identity bp_eoi: Acc ~w\n", [_Acc]),
     {ok, S};
-bp_demo_identity(X, #demo{acc=Acc}=S) ->
+bp_demo_identity(bp_work, X, #demo{acc=Acc}=S) ->
     %% ?VV("identity bp_init: X ~p my links ~p\n", [X, process_info(self(), links)]),
     Res = X,
     %% ?VV("identity: X ~w -> ~w\n", [X, Res]),
-    {[Res], S#demo{acc=Acc+Res}}.
+    {done, [Res], S#demo{acc=Acc+Res}}.
 
-bp_demo_sink({bp_init, {_,_}=MyParent}, _Ignore) ->
+bp_demo_sink(bp_init, {_,_}=MyParent, _Ignore) ->
     %% ?VV("sink bp_init: my links ~w\n", [process_info(self(), links)]),
     {ok, {[], MyParent}};
-bp_demo_sink(bp_eoi, {Acc, {MyParentPid,Ref}}=State) ->
+bp_demo_sink(bp_eoi, _, {Acc, {MyParentPid,Ref}}=State) ->
     %% ?VV("sink bp_eoi: Acc ~w\n", [Acc]),
     MyParentPid ! {sink_final_result, Ref, lists:reverse(Acc)},
     {ok, State};
-bp_demo_sink(Data, {Acc, MyParent}) ->
+bp_demo_sink(bp_work, Data, {Acc, MyParent}) ->
     %% ?VV("sink catchall: Data ~w\n", [Data]),
     {ok, {[Data|Acc], MyParent}}.
 
-bp_double({bp_init, InitData}, _Ignore) ->
+bp_double(bp_init, InitData, _Ignore) ->
     {ok, #demo{acc=InitData}};
-bp_double(bp_eoi, S) ->
+bp_double(bp_eoi, _, S) ->
     {ok, S};
-bp_double(X, #demo{acc=Acc}=S) ->
+bp_double(bp_work, X, #demo{acc=Acc}=S) ->
     Res = X * 2,
-    {[Res], S#demo{acc=Acc+Res}}.
+    {done, [Res], S#demo{acc=Acc+Res}}.
 
-bp_half({bp_init, InitData}, _Ignore) ->
+bp_half(bp_init, InitData, _Ignore) ->
     {ok, #demo{acc=InitData}};
-bp_half(bp_eoi, S) ->
+bp_half(bp_eoi, _, S) ->
     {ok, S};
-bp_half(X, #demo{acc=Acc}=S) ->
+bp_half(bp_work, X, #demo{acc=Acc}=S) ->
     Res = X / 2,
-    {[Res], S#demo{acc=Acc+Res}}.
+    {done, [Res], S#demo{acc=Acc+Res}}.
 
-bp_truncate({bp_init, InitData}, _Ignore) ->
+bp_truncate(bp_init, InitData, _Ignore) ->
     {ok, #demo{acc=InitData}};
-bp_truncate(bp_eoi, S) ->
+bp_truncate(bp_eoi, _, S) ->
     {ok, S};
-bp_truncate(X, #demo{acc=Acc}=S) ->
+bp_truncate(bp_work, X, #demo{acc=Acc}=S) ->
     Res = trunc(X),
-    {[Res], S#demo{acc=Acc+Res}}.
+    {done, [Res], S#demo{acc=Acc+Res}}.
 
-bp_verbose_sleep({bp_init, InitData}, _Ignore) ->
+bp_verbose_sleep(bp_init, InitData, _Ignore) ->
     {ok, #demo{acc=InitData}};
-bp_verbose_sleep(bp_eoi, S) ->
+bp_verbose_sleep(bp_eoi, _, S) ->
     {ok, S};
-bp_verbose_sleep(X, #demo{acc=SleepTime}=S) ->
+bp_verbose_sleep(bp_work, X, #demo{acc=SleepTime}=S) ->
     %% ?VV("verbose sleep: got ~p, my time = ~w\n", [X, SleepTime]),
     timer:sleep(SleepTime),
     %% ?VV("verbose sleep: done\n", []),
     Emits = if SleepTime == 0 -> [];
                true           -> [X]
             end,
-    {Emits, S}.
+    {done, Emits, S}.
 
 -record(crash, {
           limit  :: non_neg_integer(),
@@ -284,27 +284,27 @@ bp_verbose_sleep(X, #demo{acc=SleepTime}=S) ->
           reason :: term()
          }).
 
-bp_crash_after({bp_init, {Limit,Reason}}, _Ignore) ->
+bp_crash_after(bp_init, {Limit,Reason}, _Ignore) ->
     %% ?VV("crash bp_init: my links ~p\n", [process_info(self(), links)]),
     {ok, #crash{limit=Limit, reason=Reason, count=0}};
-bp_crash_after(bp_eoi, #crash{count=_Count}=S) ->
+bp_crash_after(bp_eoi, _, #crash{count=_Count}=S) ->
     %% ?VV("bp_crash_after: EIO count = ~w\n", [_Count]),
     {ok, S};
-bp_crash_after(X, #crash{limit=Limit, count=Count, reason=Reason}=S) ->
+bp_crash_after(bp_work, X, #crash{limit=Limit, count=Count, reason=Reason}=S) ->
     %% ?VV("crash_after X ~w Count ~w reason ~w\n", [X, Count, Reason]),
     if Count >= Limit ->
             %% ?VV("crasher: gonna crash now, my links = ~w\n", [process_info(self(), links)]),
             exit(Reason);
        true -> ok
     end,
-    {[X], S#crash{count=Count+1}}.
+    {done, [X], S#crash{count=Count+1}}.
 
-bp_prepend({bp_init, Data}, _Ignore) ->
+bp_prepend(bp_init, Data, _Ignore) ->
     {ok, Data};
-bp_prepend(bp_eoi, S) ->
+bp_prepend(bp_eoi, _, S) ->
     {ok, S};
-bp_prepend(List, S) ->
+bp_prepend(bp_work, List, S) ->
     Res = [S|List],
-    {[Res], S}.
+    {done, [Res], S}.
 
 -endif. % TEST

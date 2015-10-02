@@ -50,7 +50,7 @@ make(InFlight, WorkerFun, InitData) ->
 %% @doc Sets the sink process to receive messages from other processes.
 start(NextPid, InFlight, WorkerFun, InitData) ->
     %% ?VV("start NextPid = ~p\n", [NextPid]),
-    {ok, FittingState} = WorkerFun({bp_init, InitData}, ignored_placeholder),
+    {ok, FittingState} = WorkerFun(bp_init, InitData, ignored_placeholder),
     %% ?VV("sink: inf ~w fs ~w\n", [InFlight, FittingState]),
     receive
         {system, bp_upstream_fitting, UpstreamPid, SourcePid, ChainPids} ->
@@ -74,12 +74,12 @@ loop(UpstreamPid, NextPid, WorkerFun, FittingState) ->
             Value = sk_data:value(DataMessage),
             sk_tracer:t(50, self(), {?MODULE, data}, [{input, DataMessage}, {value, Value}]),
 
-            {ok, FittingState2} = WorkerFun(Value, FittingState),
+            {ok, FittingState2} = WorkerFun(bp_work, Value, FittingState),
             loop(UpstreamPid, NextPid, WorkerFun, FittingState2);
         {system, eos} ->
             sk_tracer:t(75, self(), {?MODULE, system}, [{msg, eos}]),
             %% ?VV("loop received eos\n", []),
-            {ok, _FittingState2} = WorkerFun(bp_eoi, FittingState),
+            {ok, _FittingState2} = WorkerFun(bp_eoi, ignored, FittingState),
             NextPid ! {system, eos},
             eos
     end.
